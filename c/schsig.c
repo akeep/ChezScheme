@@ -72,7 +72,7 @@ static void split(ptr k, ptr *s) {
     tc_mutex_release()
 }
 
-/* We may come in to S_split_and_resize with a multi-shot contination whose
+/* We may come in to S_split_and_resize with a multi-shot continuation whose
  * stack segment exceeds the copy bound or is too large to fit along
  * with the return values in the current stack.  We may also come in to
  * S_split_and_resize with a one-shot continuation for which all of the
@@ -668,13 +668,16 @@ static void handle_signal(INT sig, UNUSED siginfo_t *si, UNUSED void *data) {
         case SIGQUIT:
             RESET_SIGNAL
             S_abnormal_exit();
+	    break;	/* Pacify compilers treating fallthrough warnings as errors */
 #endif /* SIGQUIT */
         case SIGILL:
             RESET_SIGNAL
             S_error_reset("illegal instruction");
+	    break;	/* Pacify compilers treating fallthrough warnings as errors */
         case SIGFPE:
             RESET_SIGNAL
             S_error_reset("arithmetic overflow");
+	    break;	/* Pacify compilers treating fallthrough warnings as errors */
 #ifdef SIGBUS
         case SIGBUS:
 #endif /* SIGBUS */
@@ -684,9 +687,11 @@ static void handle_signal(INT sig, UNUSED siginfo_t *si, UNUSED void *data) {
                 S_error_abort("nonrecoverable invalid memory reference");
             else
                 S_error_reset("invalid memory reference");
+	    break;
         default:
             RESET_SIGNAL
             S_error_reset("unexpected signal");
+	    break;
     }
 }
 

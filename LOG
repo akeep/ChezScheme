@@ -2314,3 +2314,86 @@
   It now returns a negative number in this situation.
     cpnanopass.ss
     5_4.ms root-experr-* patch-*
+- fix ppc32 conditional-branch code generation when displacement is
+  exactly 32764
+    s/ppc32.ss
+- fix callable floating-point argument allocation on x86
+    s/cpnanopass.ss
+- corrected signature of multibyte->string and string->multibyte
+    s/primdata.ss
+- fix typos found by Eric Lindblad
+    c/alloc.c c/compress-io.c c/gc.c c/gcwrapper.c c/new-io.c c/prim5.c
+    c/schsig.c csug/csug.stex csug/syntax.stex examples/template.ss
+    mats/4.ms mats/6.ms mats/7.ms mats/8.ms mats/bytevector.ms mats/foreign.ms
+    mats/io.ms mats/mat.ss mats/misc.ms mats/oop.ms mats/oop.ss mats/profile.ms
+    mats/record.ms mats/unix.ms s/5_3.ss s/7.ss s/arm32.ss s/base-lang.ss
+    s/cmacros.ss s/cp0.ss s/cpnanopass.ss s/date.ss s/format.ss s/io.ss
+    s/mkheader.ss s/np-languages.ss s/pdhtml.ss s/ppc32.ss s/print.ss
+    s/syntax.ss s/x86.ss s/x86_64.ss
+- Unicode 14.0 support
+    unicode/* s/5_4.ss mats/5_4.ms mats/6.ms
+- don't rely on signed integer overflow (UB) in symhash implementation
+    c/foreign.c
+- Propagate immutable versions of "", #(), #vu8() and #vfx() in cp0.
+    s/cp0.ss s/cpnanopass.ss
+- correct mislabeling of some functions as macros and vice versa in
+  docs + correct name of Slocked_objectp from Sunlocked_objectp
+    csug/foreign.stex
+- fix some missing quotes around shell variable expansion; add a helpful
+  message telling how to build under Rosetta2 when running on an arm64 OSX
+    configure
+- removed comments related to a completed TODO item from s/syntax.ss
+- Unicode 15.0 support
+    unicode/* mats/5_4.ms
+- update zlib to version 1.2.13
+- fix race condition in thread mat
+    mats/thread.ms
+- fix documentation of symbol-hashtable?
+    csug/objects.stex
+- fix flags in signature of remove, member and assoc
+  they can not be discarded in case they are comparing records
+  with a custom equal procedure that has side effects.
+    s/primdata.ss mats/5_2.ms release_notes/release_notes.stex
+- fix a character comparison bug in S_intern_gensym
+    c/intern.c mats/5_7.ms mats/root-experr-compile-0-f-f-f
+    mats/root-experr-compile-2-f-f-f
+- fix crash at optimize-level 2 and higher caused by the compiler generating an
+  invalid live-pointer mask when expanding certain primitive calls that store
+  raw data on the stack and whose operands contain calls.
+  Some primitives generate raw intermediate values. When these values are live
+  across a call, the compiler saves them on the stack but could mistakenly
+  include them in the live-pointer mask. A subsequent garbage collection could
+  crash if it attempted to process a raw value as a Scheme object based on the
+  live-pointer mask.
+    mats/bytevector.ms mats/ftype.ms mats/record.ms s/cpnanopass.ss
+    s/np-languages.ss
+- fix gensym->unique-string to leave symbol unchanged on failure
+    c/externs.h c/intern.c mats/5_7.ms s/5_7.ss s/prims.ss boot/*
+    mats/root-experr-compile-0-f-f-f mats/root-experr-compile-2-f-f-f
+- fix repair to invalid live-pointer mask, where a pass did not handle the
+  new raw-data form correctly
+    mats/fx.ms s/cpnanopass.ss
+- use Robert L. Smith's 1962 complex number division algorithm to avoid nans in
+  situations involving infinite denominators
+    s/library.ss s/5_3.ss mats/5_3.ms
+- avoid implicit fallthrough warnings
+    c/scheme.c c/schsig.c c/Mf-a6le c/Mf-a6osx c/Mf-arm32le c/Mf-i3le c/Mf-i3osx
+    c/Mf-ppc32le c/Mf-ta6le c/Mf-ta6osx c/Mf-ti3le c/Mf-ti3osx c/Mf-tppc32le
+- use simpler get-string-all in fresh-line mats where the expected result
+  from block-read relied on the input-port's buffer size
+    mats/6.ms mats/patch-interpret-0-f-f-f mats/patch-interpret-0-f-t-f
+    mats/patch-interpret-3-f-f-f mats/patch-interpret-3-f-t-f
+- add transcoded-port-buffer-size parameter to permit control over the size of
+  the string buffer and ioffsets fxvector, if any, for a transcoded port.
+  add make-codec-buffer to allow control over the internal codec bytevector
+  buffer for a transcoded port. extend mats to cover different buffer sizes.
+    csug/io.stex mats/io.ms mats/patch-compile-0-t-f-f
+    mats/patch-interpret-0-f-f-f mats/patch-interpret-0-f-t-f
+    mats/root-experr-compile-0-f-f-f mats/root-experr-compile-2-f-f-f
+    release_notes/release_notes.stex s/io.ss s/primdata.ss
+- avoid extra allocation and copying when we have a single block in the
+  append-blocks procedures used by get-bytevector-all, get-bytevector-n,
+  $get-string-all, and get-string-n
+    mats/io.ms release_notes/release_notes.stex s/io.ss
+- reduce allocation and copying for certain cases in bytevector->string
+    mats/io.ms release_notes/release_notes.stex s/io.ss

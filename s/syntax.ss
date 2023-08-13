@@ -39,26 +39,6 @@
 ; TODO:
 ; * fix to provide source information:
 ;   Error: missing definition for export(s) (y).
-; * work on marked identifiers:
-;   This works:
-;       > (define-syntax a
-;           (syntax-rules ()
-;             ((_ x c) (begin (define y c) (define x (lambda () y))))))
-;       > (a one 1)
-;       > (a two 2)
-;       > (one)
-;       1
-;       > (two)
-;       2
-;   But this does not:
-;       > (define-syntax a
-;         (syntax-rules ()
-;           ((_ x c) (begin (define x (lambda () y)) (define y c)))))
-;       > (a one 1)
-;       > (one)
-;       Error: variable y is not bound.
-;   The problem is that we are not establishing the substitution from
-;   y to its generated name until after we've expanded (lambda () y).
 ; * give ourselves better syntax-error formatting tools
 ; * unload module before loading it in sc-put-cte
 ; * consider allowing exports to be defined externally
@@ -167,12 +147,6 @@
 ;;; (x) => 17
 ;;; (x) => 34
 ;;; secret => Error: variable secret is not bound
-;;;
-;;; The definition above would fail if the definition for secret
-;;; were placed after the definition for var, since the expander would
-;;; encounter the references to secret before the definition that
-;;; establishes the compile-time map from the identifier secret to
-;;; the generated identifier.
 
 ;;; Identifiers and syntax objects are implemented as vectors for
 ;;; portability.  As a result, it is possible to "forge" syntax
@@ -311,7 +285,7 @@
 ;;;   - copy-environment creates new top-level labels/locations for and only
 ;;;     for variables whose locations are the default ones for the old
 ;;;     environment.  All other mappings from symbol to label should be
-;;;     transfered from the old to the new environment.
+;;;     transferred from the old to the new environment.
 
 ;;; Bootstrapping:
 
@@ -1488,14 +1462,14 @@
   ;; environment.  top-id-bound-label directly extends the specified
   ;; top-level environment.
   ;;
-  ;; For top-id-bound-label, we extend the environment with a substition
+  ;; For top-id-bound-label, we extend the environment with a substitution
   ;; keyed by the given marks, so that top-level definitions introduced by
   ;; a macro are distinct from other top-level definitions for the same
   ;; name.  For example, if macros a and b both introduce definitions and
   ;; bound references to identifier x, the two x's should be different,
   ;; i.e., keyed by their own marks.
   ;;
-  ;; For top-id-free-label, we extend the environment with a substition
+  ;; For top-id-free-label, we extend the environment with a substitution
   ;; keyed by the top marks, since top-level free identifier references
   ;; should refer to the existing implicit (top-marked) substitution.  For
   ;; example, if macros a and b both introduce free references to identifier
@@ -7195,7 +7169,7 @@
   (define d->s
     (lambda (id datum who)
       (unless (nonsymbol-id? id) ($oops who "~s is not an identifier" id))
-     ; no longer transfering annotation, since this can produce
+     ; no longer transferring annotation, since this can produce
      ; misleading profile output
       (make-syntax-object datum (syntax-object-wrap id))))
   (set-who! datum->syntax
@@ -7587,7 +7561,7 @@
 ;; ========================================================================
 ;; The exclusive cond macro -- restricted cond, and clauses must be mutually exclusive.
 ;;
-;; Uses profiling information to rearrange clauses in most likley to succeed order.
+;; Uses profiling information to rearrange clauses in most likely to succeed order.
 ;; ========================================================================
 
 (define-syntax exclusive-cond

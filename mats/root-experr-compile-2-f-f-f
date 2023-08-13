@@ -1980,6 +1980,9 @@ primvars.mo:Expected error in mat trace-output-port: "trace-output-port: #<input
 5_4.mo:Expected error in mat char->integer: "incorrect argument count in call (char->integer #\a #\b)".
 5_4.mo:Expected error in mat char->integer: "char->integer: a is not a character".
 5_4.mo:Expected error in mat char->integer: "char->integer: <int> is not a character".
+5_4.mo:Expected error in mat char-: "incorrect argument count in call (char-)".
+5_4.mo:Expected error in mat char-: "incorrect argument count in call (char- #\a #\b #\c)".
+5_4.mo:Expected error in mat char-: "char-: 4 is not a character".
 5_4.mo:Expected error in mat string-for-each: "incorrect argument count in call (string-for-each)".
 5_4.mo:Expected error in mat string-for-each: "incorrect argument count in call (string-for-each (quote #()))".
 5_4.mo:Expected error in mat string-for-each: "incorrect argument count in call (string-for-each +)".
@@ -4886,25 +4889,6 @@ cp0.mo:Expected error in mat expand/optimize-output: "expand/optimize-output: #<
 6.mo:Expected error in mat read-test: "read: U+194D symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat read-test: "read: U+194E symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat read-test: "read: U+194F symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B3 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B4 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B5 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B6 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B7 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19B9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BA symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BB symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BC symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BD symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BE symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19BF symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19C0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19C8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat read-test: "read: U+19C9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat read-test: "read: U+19D0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat read-test: "read: U+19D1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat read-test: "read: U+19D2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
@@ -5711,25 +5695,6 @@ cp0.mo:Expected error in mat expand/optimize-output: "expand/optimize-output: #<
 6.mo:Expected error in mat load-test: "read: U+194D symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat load-test: "read: U+194E symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat load-test: "read: U+194F symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B3 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B4 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B5 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B6 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B7 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19B9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BA symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BB symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BC symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BD symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BE symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19BF symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19C0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19C8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat load-test: "read: U+19C9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat load-test: "read: U+19D0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat load-test: "read: U+19D1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat load-test: "read: U+19D2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
@@ -6536,25 +6501,6 @@ cp0.mo:Expected error in mat expand/optimize-output: "expand/optimize-output: #<
 6.mo:Expected error in mat compile-test: "read: U+194D symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat compile-test: "read: U+194E symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat compile-test: "read: U+194F symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B3 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B4 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B5 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B6 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B7 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19B9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BA symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BB symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BC symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BD symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BE symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19BF symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19C0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19C8 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
-6.mo:Expected error in mat compile-test: "read: U+19C9 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat compile-test: "read: U+19D0 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat compile-test: "read: U+19D1 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
 6.mo:Expected error in mat compile-test: "read: U+19D2 symbol syntax is not allowed in #!r6rs mode at line 3, char 8 of testfile.ss".
@@ -6925,6 +6871,21 @@ io.mo:Expected error in mat port-operations3: "port-file-descriptor: oops is not
 io.mo:Expected error in mat port-operations3: "port-file-descriptor: #<input port string> is not a file port".
 io.mo:Expected error in mat iconv-codec: "iconv-codec: -73 is not a string".
 io.mo:Expected error in mat iconv-codec: "transcoded-port: unsupported encoding almost certainly bogus".
+io.mo:Expected error in mat iconv-codec: "display-string: iconv CP1252 codec cannot encode #\x3BB".
+io.mo:Expected error in mat iconv-codec: "newline: iconv CP1252 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "newline: latin-1 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "iconv-codec: -73 is not a string".
+io.mo:Expected error in mat iconv-codec: "transcoded-port: unsupported encoding almost certainly bogus".
+io.mo:Expected error in mat iconv-codec: "display-string: iconv CP1252 codec cannot encode #\x3BB".
+io.mo:Expected error in mat iconv-codec: "newline: iconv CP1252 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "newline: latin-1 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "iconv-codec: -73 is not a string".
+io.mo:Expected error in mat iconv-codec: "transcoded-port: unsupported encoding almost certainly bogus".
+io.mo:Expected error in mat iconv-codec: "close-port: iconv CP1252 codec cannot encode #\x3BB".
+io.mo:Expected error in mat iconv-codec: "close-port: iconv CP1252 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "close-port: latin-1 codec cannot encode #\newline with eol-style ls".
+io.mo:Expected error in mat iconv-codec: "iconv-codec: -73 is not a string".
+io.mo:Expected error in mat iconv-codec: "transcoded-port: unsupported encoding almost certainly bogus".
 io.mo:Expected error in mat iconv-codec: "close-port: iconv CP1252 codec cannot encode #\x3BB".
 io.mo:Expected error in mat iconv-codec: "close-port: iconv CP1252 codec cannot encode #\newline with eol-style ls".
 io.mo:Expected error in mat iconv-codec: "close-port: latin-1 codec cannot encode #\newline with eol-style ls".
@@ -7113,6 +7074,17 @@ io.mo:Expected error in mat custom-port-buffer-size: "custom-port-buffer-size: 0
 io.mo:Expected error in mat custom-port-buffer-size: "custom-port-buffer-size: -15 is not a positive fixnum".
 io.mo:Expected error in mat custom-port-buffer-size: "custom-port-buffer-size: <int> is not a positive fixnum".
 io.mo:Expected error in mat custom-port-buffer-size: "custom-port-buffer-size: 1024.0 is not a positive fixnum".
+io.mo:Expected error in mat transcoded-port-buffer-size: "incorrect argument count in call (transcoded-port-buffer-size 1024 15)".
+io.mo:Expected error in mat transcoded-port-buffer-size: "transcoded-port-buffer-size: shoe is not a positive fixnum".
+io.mo:Expected error in mat transcoded-port-buffer-size: "transcoded-port-buffer-size: 0 is not a positive fixnum".
+io.mo:Expected error in mat transcoded-port-buffer-size: "transcoded-port-buffer-size: -15 is not a positive fixnum".
+io.mo:Expected error in mat transcoded-port-buffer-size: "transcoded-port-buffer-size: <int> is not a positive fixnum".
+io.mo:Expected error in mat transcoded-port-buffer-size: "transcoded-port-buffer-size: 1024.0 is not a positive fixnum".
+io.mo:Expected error in mat make-codec-buffer: "incorrect argument count in call (make-codec-buffer (lambda (bp) (make-bytevector 4)) "extra arg")".
+io.mo:Expected error in mat make-codec-buffer: "make-codec-buffer: shoe is not a procedure".
+io.mo:Expected error in mat make-codec-buffer: "transcoded-port: make-codec-buffer #<procedure bad1> did not return a mutable bytevector of length at least four".
+io.mo:Expected error in mat make-codec-buffer: "transcoded-port: make-codec-buffer #<procedure bad2> did not return a mutable bytevector of length at least four".
+io.mo:Expected error in mat make-codec-buffer: "transcoded-port: make-codec-buffer #<procedure bad3> did not return a mutable bytevector of length at least four".
 io.mo:Expected error in mat compress-parameters: "compress-format: foo is not a supported format".
 io.mo:Expected error in mat compress-parameters: "compress-format: "gzip" is not a supported format".
 io.mo:Expected error in mat compress-parameters: "compress-level: foo is not a supported level".
@@ -7223,6 +7195,12 @@ io.mo:Expected error in mat get/put-datum: "incorrect argument count in call (pu
 io.mo:Expected error in mat get/put-datum: "incorrect argument count in call (put-datum (current-output-port) (quote a) (quote a))".
 io.mo:Expected error in mat get/put-datum: "put-datum: #<input port string> is not a textual output port".
 io.mo:Expected error in mat get/put-datum: "put-datum: #<binary output port bytevector> is not a textual output port".
+io.mo:Expected error in mat utf-16-codec: "incorrect argument count in call (utf-16-codec #f)".
+io.mo:Expected error in mat utf-16-codec: "utf-16-codec: invalid endianness #f".
+io.mo:Expected error in mat utf-16-codec: "incorrect argument count in call (utf-16-codec #f)".
+io.mo:Expected error in mat utf-16-codec: "utf-16-codec: invalid endianness #f".
+io.mo:Expected error in mat utf-16-codec: "incorrect argument count in call (utf-16-codec #f)".
+io.mo:Expected error in mat utf-16-codec: "utf-16-codec: invalid endianness #f".
 io.mo:Expected error in mat utf-16-codec: "incorrect argument count in call (utf-16-codec #f)".
 io.mo:Expected error in mat utf-16-codec: "utf-16-codec: invalid endianness #f".
 io.mo:Expected error in mat to-fold-or-not-to-fold: "get-datum: invalid character name #\newLine at char 0 of #<input port string>".

@@ -695,15 +695,15 @@
   (fold-left [sig [(procedure ptr list list ...) -> (ptr ...)]] [flags cp03])
   (fold-right [sig [(procedure ptr list list ...) -> (ptr ...)]] [flags cp03])
   (remp [sig [(procedure list) -> (list)]] [flags true cp03])
-  (remove [sig [(ptr list) -> (list)]] [flags alloc cp02]) ; mifoldable discard could break eq?
+  (remove [sig [(ptr list) -> (list)]] [flags true cp02]) ; mifoldable discard could break eq?
   (remv [sig [(ptr list) -> (list)]] [flags alloc cp02]) ; mifoldable discard could break eq?
   (remq [sig [(ptr list) -> (list)]] [flags alloc cp02]) ; mifoldable discard could break eq?
   (memp [sig [(procedure sub-ptr) -> (ptr)]] [flags cp03])
-  (member [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
+  (member [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable cp02 ieee r5rs])
   (memv [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
   (memq [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
   (assp [sig [(procedure sub-ptr) -> (ptr)]] [flags cp03])
-  (assoc [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
+  (assoc [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable cp02 ieee r5rs])
   (assv [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
   (assq [sig [(ptr sub-ptr) -> (ptr)]] [flags mifoldable discard cp02 ieee r5rs])
   (cons* [sig [(ptr) -> (ptr)] [(ptr ptr ptr ...) -> ((ptr . ptr))]] [flags unrestricted discard cp02])
@@ -980,6 +980,7 @@
   (library-requirements [sig [(sub-list) -> (list)] [(sub-list library-requirements-options) -> (list)]] [flags])
   (library-search-handler [sig [() -> (procedure)] [(procedure) -> (void)]] [flags])
   (library-version [sig [(sub-list) -> (list)]] [flags])
+  (make-codec-buffer [sig [() -> (procedure)] [(procedure) -> (void)]] [flags])
   (optimize-level [sig [() -> (ufixnum)] [(sub-ufixnum) -> (void)]] [flags])
   (pretty-initial-indent [sig [() -> (ufixnum)] [(ufixnum) -> (void)]] [flags])
   (pretty-line-length [sig [() -> (ufixnum)] [(sub-ufixnum) -> (void)]] [flags])
@@ -1015,6 +1016,7 @@
   (timer-interrupt-handler [sig [() -> (procedure)] [(procedure) -> (void)]] [flags])
   (trace-output-port [sig [() -> (maybe-textual-output-port)] [(maybe-textual-output-port) -> (void)]] [flags])
   (trace-print [sig [() -> (procedure)] [(procedure) -> (void)]] [flags])
+  (transcoded-port-buffer-size [sig [() -> (ufixnum)] [(sub-fixnum) -> (void)]] [flags])
   (undefined-variable-warnings [sig [() -> (boolean)] [(ptr) -> (void)]] [flags unrestricted])
   (waiter-prompt-string [sig [() -> (string)] [(string) -> (void)]] [flags])
   (waiter-prompt-and-read [sig [() -> (procedure)] [(procedure) -> (void)]] [flags])
@@ -1471,7 +1473,7 @@
   (merge [sig [(procedure list list) -> (list)]] [flags true])
   (merge! [sig [(procedure list list) -> (list)]] [flags true])
   (mkdir [sig [(pathname) (pathname sub-uint) -> (void)]] [flags])
-  (multibyte->string [feature windows] [sig [(sub-uint bytevector) -> (string)]] [flags true discard])
+  (multibyte->string [feature windows] [sig [(sub-ptr bytevector) -> (string)]] [flags true discard])
   (mutable-box? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
   (mutable-string? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
   (mutable-fxvector? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
@@ -1652,7 +1654,7 @@
   (standard-output-port [sig [() (sub-symbol) (sub-symbol maybe-transcoder) -> (output-port)]] [flags true])
   (standard-error-port [sig [() (sub-symbol) (sub-symbol maybe-transcoder) -> (output-port)]] [flags true])
   (statistics [sig [() -> (sstats)]] [flags unrestricted alloc])
-  (string->multibyte [feature windows] [sig [(sub-uint string) -> (bytevector)]] [flags true discard])
+  (string->multibyte [feature windows] [sig [(sub-ptr string) -> (bytevector)]] [flags true discard])
   (string->number [sig [(string) (string sub-ufixnum) -> (maybe-number)]] [flags discard]) ; radix not restricted to 2, 4, 8, 16
   (string<=? [sig [(string string ...) -> (boolean)]] [flags mifoldable discard])        ; not restricted to 2+ arguments
   (string<? [sig [(string string ...) -> (boolean)]] [flags mifoldable discard])         ; not restricted to 2+ arguments

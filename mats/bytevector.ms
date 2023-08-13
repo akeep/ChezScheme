@@ -2307,6 +2307,50 @@
       (unless (eqv? (eval `(bytevector-u24-ref ,(apply bytevector ls) 1 'big))
                     (apply big-endian->unsigned (cdr ls)))
         (errorf #f "failed for ~s (big)" ls))))
+
+  ;; catch live-pointer mask issue
+  (or (not #%$compiler-is-loaded?)
+      (#%$suppress-primitive-inlining)
+      (< (optimize-level) 3)
+      (let ()
+        (define-syntax (test-width x)
+          (syntax-case x ()
+            [(_ width) #'(test-width width 3)]
+            [(_ width prim-optimize-level)
+             (memq (datum width) '(24 32 40 48 56 64))
+             (with-syntax ([smash! (datum->syntax #'top
+                                     (string->symbol
+                                      (format "bytevector-u~s-set!" (datum width))))])
+               #'(let ()
+                   (define bait (cons 0 0))
+                   (define addr (#%$object-address bait 0))
+                   (define type-mask (- (ftype-sizeof uptr) 1))
+                   (define wrong-tag-bits
+                     (logand type-mask
+                             (#%$object-address values 0)))
+                   ;; try to poison non-closure
+                   (set-car! bait bait)
+                   (set-cdr! bait bait)
+                   (let ([expected (make-bytevector 9 0)]
+                         [s1 "#b001"]
+                         ;; masquerade pair as a closure
+                         [s2 (format "#b~b"
+                               (logand (- (ash 1 (datum width)) 1)
+                                       (bitwise-copy-bit-field addr 0 (integer-length type-mask)
+                                         wrong-tag-bits)))])
+                     (define (get-index i) (collect) (read (open-input-string s1)))
+                     (define (get-value i) (collect) (read (open-input-string s2)))
+                     (smash! expected (get-index 0) (get-value 0) 'big)
+                     (do ([i 0 (fx+ i 1)]) ((fx= i 1000))
+                       (let ([actual (make-bytevector 9 0)])
+                         (($primitive prim-optimize-level smash!)
+                          actual (get-index i) (get-value i) 'big)
+                         (unless (equal? actual expected)
+                           (raise `(mismatch: expected ,expected actual ,actual))))))
+                   #t))]))
+        (test-width 32)
+        (test-width 64)))
+
 )
 
 (mat bytevector-s24-set!
@@ -10408,7 +10452,7 @@
                                #x01 #x00 #x00 #x65
                                #x00 #x00 #x00 #x65)
                         'big
-                        ; rkd: added endianness-manditory? flag
+                        ; rkd: added endianness-mandatory? flag
                         #t))
                 => #t)
 
@@ -10454,7 +10498,7 @@
                                #x65 #x00 #x00 #x01
                                #x65 #x00 #x00 #x00)
                         'little
-                        ; rkd: added endianness-manditory? flag
+                        ; rkd: added endianness-mandatory? flag
                         #t))
                 => #t)
 
@@ -10920,7 +10964,7 @@
 
     #t)
 
- ; Currently the reference implementation is the only implemenation,
+ ; Currently the reference implementation is the only implementation,
  ; so go ahead and use it for the tests and the random tests below.
   (define bytevector-and $bytevector-and)
   (define bytevector-ior $bytevector-ior)

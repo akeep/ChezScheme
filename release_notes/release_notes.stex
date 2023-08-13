@@ -58,6 +58,11 @@ Online versions of both books can be found at
 %-----------------------------------------------------------------------------
 \section{Functionality Changes}\label{section:functionality}
 
+\subsection{Unicode 15.0 Support (9.6.0)}
+
+The character sets, character classes, and word-breaking algorithms for character, string,
+and Unicode-related bytevector operations have now been updated to Unicode 15.0.
+
 \subsection{Basic ftypes can be referenced, even if shadowed by syntactic binding (9.5.8)}
 
 Previously, it was possible to interfere with the definition of ftypes by
@@ -1947,12 +1952,57 @@ by macros) into code to be compiled via \scheme{compile-file},
 Ftype-pointer fields are not supported, since storing addresses
 in fasl files does not generally make sense.
 
+\subsection{New transcoded port buffer-size parameters}
+
+The new parameter \scheme{transcoded-port-buffer-size} specifies the size
+of the string buffer that is allocated when creating a new transcoded port.
+If the underlying binary port implements \scheme{port-position},
+a transcoded input port allocates an internal fxvector the same size
+as its string buffer for use by \scheme{port-position}.
+The new parameter \scheme{make-codec-buffer} can be used to supply an appropriately
+sized internal bytevector buffer for the codec used by a new transcoded port.
+The size of these string and bytevector buffers was previously hardcoded at 1024.
+
 %-----------------------------------------------------------------------------
 \section{Bug Fixes}\label{section:bugfixes}
 
+\subsection{Division by an infinite complex number sometimes incorrectly returns +nan.0 (9.6.0)}
+
+A bug that caused \scheme{/}, \scheme{cfl/}, \scheme{atan}, and \scheme{atanh} to return
+an incorrect real or imaginary +nan.0 component has been fixed. The inexact complex number
+division routine now uses Robert L. Smith's 1962 algorithm.
+
+\subsection{Invalid live-pointer mask for some inline primitive calls (9.6.0)}
+
+Fixed a crash at optimize-level 2 and higher caused by the compiler generating
+an invalid live-pointer mask when inline-expanding certain primitive calls that
+store raw data on the stack and whose operands contain calls.
+
+\subsection{Optimization bug in \protect\scheme{remove},
+  \protect\scheme{member} and \protect\scheme{assoc} (9.6.0)}
+
+When \scheme{remove}, \scheme{member} or \scheme{assoc} were used in
+\scheme{optimize-level} 3 in a position where the result was discarded,
+a bug in the source code optimizer could drop the call even though the first
+argument may be a record with a custom equality predicate that has side effects.
+
+\subsection{Foreign-callable floating-point argument allocation for x86 (9.6.0)}
+
+When a foreign callable receives a \scheme{double} or \scheme{float} argument, the
+allocation of space to box the number would try to save the
+floating-point return register in the (rare) case that allocation
+requires a new page of memory. Saving the return register is harmless on
+most platforms, but on x86, a save and restore involves popping then
+pushing the x87 register stack, which is invalid if nothing was there
+at the start.
+
+\subsection{Code generation for a specific branch displacement on ppc32 (9.6.0)}
+
+Branch generation would go wrong if the displacement was exactly 32,764 bytes.
+
 \subsection{\scheme{char-} returns negative results (9.6.0)}
 
-The character difference oprator returned a large positive integer in
+The character difference operator returned a large positive integer in
 situations where the first argument is represented by a lower number than the
 second argument.  For example: \scheme{(char- #\a #\b)} on 64-bit macOS returns
 \scheme{720575940379279351}.  The fix corrects this, so that it instead
@@ -2880,5 +2930,21 @@ predicates, accessors, mutators, and (depending on protocols)
 constructors created by a record definition in one library and exported
 by another are inlined in the importing library, just as if the record
 type were defined in the importing library.
+
+\subsection{Reduced allocation and copying}
+
+When given a bytevector whose length is less than \scheme{file-buffer-size},
+\scheme{bytevector->string} now allocates the minimum size string buffer,
+internal ioffsets fxvector, and internal codec buffer.
+The size of each was formerly hardcoded at 1024.
+The
+\scheme{bytevector->string},
+\scheme{get-bytevector-all},
+\scheme{get-bytevector-n},
+\scheme{get-string-all}, and
+\scheme{get-string-n} procedures
+may avoid extra allocation and copying when the result is not more than
+\scheme{file-buffer-size} and no intermediate reads need to be stitched
+together to form the result.
 
 \end{document}
