@@ -828,6 +828,8 @@ Otherwise, the expander loads the source file.
 (Loading the source file actually causes the code to be compiled,
 assuming the default value of \scheme{current-eval}, but the compiled
 code is not saved to an object file.)
+The \scheme{library-timestamp-mode} parameter controls the meaning of ``older''
+for comparing library sources and object files.
 An exception is raised during this process if a
 source or object file exists but is not readable or if an object
 file cannot be created.
@@ -1223,7 +1225,8 @@ control parameters are described in Section~\ref{SECTSMGMTGC}.
 \index{profiling}%
 Finally, it is often useful to ``profile'' your code to determine that
 parts of the code that are executed most frequently.
-While this will not help the system optimize your code, it can help
+While this may help the system optimize your code, the primary
+benefit is to help
 you identify ``hot spots'' where you need to concentrate your own
 hand-optimization efforts.
 In these hot spots, consider using more efficient operators, like
@@ -1235,7 +1238,7 @@ These operators can make code more readable when used judiciously,
 but they can slow down time-critical code.
 
 Section~\ref{SECTMISCPROFILE} describes how to use the compiler's support
-for automatic profiling.
+for automatic profiling and profile-directed optimization.
 Be sure that profiling is not enabled when you compile your production
 code, since the code introduced into the generated code to perform the
 profiling adds significant run-time overhead.
@@ -1715,6 +1718,8 @@ shortcuts to run the executable.
 \index{\scheme{--retain-static-relocation} command-line option}%
 \index{\scheme{-b} command-line option}%
 \index{\scheme{--boot} command-line option}%
+\index{\scheme{-B} command-line option}%
+\index{\scheme{--Boot} command-line option}%
 \index{\scheme{--verbose} command-line option}%
 \index{\scheme{--version} command-line option}%
 \index{\scheme{--help} command-line option}%
@@ -1734,6 +1739,8 @@ shortcuts to run the executable.
     & ~~set library extensions\\
 \scheme{--compile-imported-libraries}
     & ~~compile libraries before loading\\
+\scheme{--disable-library-timestamps}
+    & ~~do not check modification dates on library sources\\
 \scheme{--import-notify}
     & ~~enable import search messages\\
 \scheme{--optimize-level 0 | 1 | 2 | 3}
@@ -1750,6 +1757,8 @@ shortcuts to run the executable.
     & ~~keep reloc info for compute-size, etc.\\
 \scheme{-b \var{path}}, \scheme{--boot \var{path}}
     & ~~load boot file\\
+\scheme{-B \var{path}}, \scheme{--Boot \var{path}}
+    & ~~load boot file relative to the current directory\\
 \scheme{--verbose}
     & ~~trace boot-file search process\\
 \scheme{--version}
@@ -1799,8 +1808,9 @@ the Scheme system, including the interpreter, compiler, and most
 libraries.
 Boot
 files may be specified explicitly on the command
-line via \scheme{-b}
-options or implicitly.
+line via \scheme{-b} (relative to installation directory unless absolute or
+starting with a \scheme{.} or \scheme{..} path element) or \scheme{-B}
+(relative to current directory unless absolute) options or implicitly.
 In the simplest case, no \scheme{-b}
 options
 are given and the necessary boot
@@ -1827,13 +1837,14 @@ arguments for which search tracing is desired.
 
 Ordinarily, the search for
 boot files is limited to a set of
-installation directories, but this may be overridden by setting
+installation directories relative to the executable, but this may be overridden by setting
 the environment variable \index{\scheme{SCHEMEHEAPDIRS}}\scheme{SCHEMEHEAPDIRS}.
 \scheme{SCHEMEHEAPDIRS} should be a colon-separated list of directories, listed in
 the order in which they should be searched.
-Within each directory, the two-character escape sequence ``\scheme{%v}''
-is replaced by the current version, and the two-character escape sequence
-``\scheme{%m}'' is replaced by the machine type.
+Within each directory, the two-character escape sequence ``\scheme{%v}'' is
+replaced by the current version, the two-character escape sequence ``\scheme{%m}''
+is replaced by the machine type, and the two-character escape sequence ``\scheme{%x}''
+is replaced by the directory in which the executable file resides.
 A percent followed by any other character is replaced by the second
 character; in particular, ``\scheme{%%}'' is replaced by ``\scheme{%}'', and
 ``\scheme{%:}'' is replaced by ``\scheme{:}''.
@@ -1841,9 +1852,7 @@ If \scheme{SCHEMEHEAPDIRS} ends in a non-escaped colon, the default directories 
 searched after those in \scheme{SCHEMEHEAPDIRS}; otherwise, only those listed in
 \scheme{SCHEMEHEAPDIRS} are searched.
 
-Under Windows, semi-colons are used in place of colons, and one additional
-escape is recognized: ``\scheme{%x},'' which is replaced by the directory in
-which the executable file resides.
+Under Windows, semi-colons are used in place of colons.
 The default search path under Windows consists of ``\scheme{%x}''
 and ``\scheme{%x\..\..\boot\%m}.''
 The registry key \scheme{HeapSearchPath} in
@@ -1858,4 +1867,3 @@ a boot header and the compiled code for one or more
 source files.
 See Section~\ref{SECTUSEAPPLICATIONS} for instructions on how to create
 boot files.
-

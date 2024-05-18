@@ -36,7 +36,7 @@ static ptr big_mul(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL sign);
 static void big_short_trunc(ptr tc, ptr x, bigit s, iptr xl, IBOOL qs, IBOOL rs, ptr *q, ptr *r);
 static void big_trunc(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL qs, IBOOL rs, ptr *q, ptr *r);
 static INT normalize(bigit *xp, bigit *yp, iptr xl, iptr yl);
-static bigit quotient_digit(bigit *xp, bigit *yp, iptr yl);
+static bigit quotient_digit(ptr tc, bigit *xp, bigit *yp, iptr yl);
 static bigit qhat(bigit *xp, bigit *yp);
 static ptr big_short_gcd(ptr tc, ptr x, bigit y, iptr xl);
 static ptr big_gcd(ptr tc, ptr x, ptr y, iptr xl, iptr yl);
@@ -73,7 +73,7 @@ static ptr big_logxor(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL xs, IBOOL ys
 }
 
 #define IBIGITBIGIT_TO_BIGNUM(tc,B,x,cnt,sign) {\
-  ibigitbigit _i_ = x; bigitbigit _u_; bigit _b_;\
+  ibigitbigit _i_ = x; bigitbigit _u_; bigitbigit _b_;\
   PREPARE_BIGNUM(tc, B, 2)\
   _u_ = (*sign = (_i_ < 0)) ? -_i_ : _i_;\
   if ((_b_ = (_u_ & (bigitbigit)bigit_mask)) == _u_) {\
@@ -82,12 +82,12 @@ static ptr big_logxor(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL xs, IBOOL ys
   } else {\
     *cnt = 2;\
     BIGIT(B,0) = (bigit)(_u_ >> bigit_bits);\
-    BIGIT(B,1) = _b_;\
+    BIGIT(B,1) = (bigit)_b_;\
   }\
 }
 
 #define UBIGITBIGIT_TO_BIGNUM(tc,B,x,cnt) {\
-  bigitbigit _u_ = x; bigit _b_;\
+  bigitbigit _u_ = x; bigitbigit _b_;\
   PREPARE_BIGNUM(tc, B, 2)\
   if ((_b_ = (_u_ & (bigitbigit)bigit_mask)) == _u_) {\
     *cnt = 1;\
@@ -95,7 +95,7 @@ static ptr big_logxor(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL xs, IBOOL ys
   } else {\
     *cnt = 2;\
     BIGIT(B,0) = (bigit)(_u_ >> bigit_bits);\
-    BIGIT(B,1) = _b_;\
+    BIGIT(B,1) = (bigit)_b_;\
   }\
 }
 
@@ -119,7 +119,7 @@ static ptr big_logxor(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL xs, IBOOL ys
 #endif
 
 #if (U64_bigits == 4)
-see v7.4 number.c for U64_TO_BIGNUM w/U64_bigits == 4
+#error see v7.4 number.c for U64_TO_BIGNUM w/U64_bigits == 4
 #endif
 
 #define ptr_bigits (ptr_bits / bigit_bits)
@@ -202,14 +202,17 @@ static ptr copy_normalize(ptr tc, const bigit *p, iptr len, IBOOL sign) {
   return b;
 }
 
+#define RETURN_STRY_OK(expr) { *val = expr; return 1; }
+#define RETURN_STRY_ERROR(why) { if (reason) *reason = why; return 0; }
+
 /* -2^(b-1) <= x <= 2^b-1, where b = number of bits in a uptr */
-iptr S_integer_value(const char *who, ptr x) {
-  if (Sfixnump(x)) return UNFIX(x);
+IBOOL Stry_integer_value(ptr x, iptr *val, const char** reason) {
+  if (Sfixnump(x)) RETURN_STRY_OK(UNFIX(x))
 
   if (Sbignump(x)) {
     iptr xl; uptr u;
 
-    if ((xl = BIGLEN(x)) > ptr_bigits) S_error1(who, "~s is out of range", x);
+    if ((xl = BIGLEN(x)) > ptr_bigits) RETURN_STRY_ERROR("~s is out of range")
 
     u = BIGIT(x,0);
 
@@ -217,69 +220,48 @@ iptr S_integer_value(const char *who, ptr x) {
     if (xl == 2) u = (u << bigit_bits) | BIGIT(x,1);
 #endif
 
-    if (!BIGSIGN(x)) return (iptr)u;
-    if (u < ((uptr)1 << (ptr_bits - 1))) return -(iptr)u;
-    if (u > ((uptr)1 << (ptr_bits - 1))) S_error1(who, "~s is out of range", x);
+    if (!BIGSIGN(x)) RETURN_STRY_OK((iptr)u)
+    if (u < ((uptr)1 << (ptr_bits - 1))) RETURN_STRY_OK(-(iptr)u)
+    if (u > ((uptr)1 << (ptr_bits - 1))) RETURN_STRY_ERROR("~s is out of range")
 #if (fixnum_bits > 32)
-    return (iptr)0x8000000000000000;
+    RETURN_STRY_OK((iptr)0x8000000000000000)
 #else
-    return (iptr)0x80000000;
+    RETURN_STRY_OK((iptr)0x80000000)
 #endif
   }
 
-  S_error1(who, "~s is not an integer", x);
-
-  return 0 /* not reached */;
-}
-
-/* -2^(b-1) <= x <= 2^b-1, where b = number of bits in a uptr */
-IBOOL S_integer_valuep(ptr x) {
-  if (Sfixnump(x)) return 1;
-
-  if (Sbignump(x)) {
-    iptr xl; uptr u;
-
-    if ((xl = BIGLEN(x)) > ptr_bigits) return 0;
-
-    u = BIGIT(x,0);
-
-#if (ptr_bigits == 2)
-    if (xl == 2) u = (u << bigit_bits) | BIGIT(x,1);
-#endif
-
-    if (!BIGSIGN(x)) return 1;
-    return u <= ((uptr)1 << (ptr_bits - 1));
-  }
-
-  return 0;
+  RETURN_STRY_ERROR("~s is not an integer")
 }
 
 iptr Sinteger_value(ptr x) {
-  return S_integer_value("Sinteger_value", x);
+  iptr result;
+  const char* reason;
+  if (Stry_integer_value(x, &result, &reason)) return result;
+  S_error1("Sinteger_value", reason, x);
 }
 
 /* -2^31 <= x <= 2^32-1 */
-I32 S_int32_value(char *who, ptr x) {
+IBOOL Stry_integer32_value(ptr x, Sint32_t* val, const char** reason) {
 #if (fixnum_bits > 32)
   if (Sfixnump(x)) {
     iptr n = UNFIX(x);
     if (n < 0) {
-      I32 m = (I32)n;
-      if ((iptr)m == UNFIX(x)) return m;
+      Sint32_t m = (Sint32_t)n;
+      if ((iptr)m == UNFIX(x)) RETURN_STRY_OK(m)
     } else {
-      U32 m = (U32)n;
-      if ((uptr)m == (uptr)UNFIX(x)) return (I32)m;
+      Suint32_t m = (Suint32_t)n;
+      if ((uptr)m == (uptr)UNFIX(x)) RETURN_STRY_OK((Sint32_t)m)
     }
-    S_error1(who, "~s is out of range", x);
+    RETURN_STRY_ERROR("~s is out of range")
   }
-  if (Sbignump(x)) S_error1(who, "~s is out of range", x);
+  if (Sbignump(x)) RETURN_STRY_ERROR("~s is out of range")
 #else /* (fixnum_bits > 32) */
-  if (Sfixnump(x)) return UNFIX(x);
+  if (Sfixnump(x)) RETURN_STRY_OK(UNFIX(x))
 
   if (Sbignump(x)) {
-    iptr xl; U32 u;
+    iptr xl; Suint32_t u;
 
-    if ((xl = BIGLEN(x)) > U32_bigits) S_error1(who, "~s is out of range", x);
+    if ((xl = BIGLEN(x)) > U32_bigits) RETURN_STRY_ERROR("~s is out of range")
 
     u = BIGIT(x,0);
 
@@ -287,30 +269,31 @@ I32 S_int32_value(char *who, ptr x) {
     if (xl == 2) u = (u << bigit_bits) | BIGIT(x,1);
 #endif
 
-    if (!BIGSIGN(x)) return (I32)u;
-    if (u < ((U32)1 << 31)) return -(I32)u;
-    if (u > ((U32)1 << 31)) S_error1(who, "~s is out of range", x);
-    return (I32)0x80000000;
+    if (!BIGSIGN(x)) RETURN_STRY_OK((Sint32_t)u)
+    if (u < ((Suint32_t)1 << 31)) RETURN_STRY_OK(-(Sint32_t)u)
+    if (u > ((Suint32_t)1 << 31)) RETURN_STRY_ERROR("~s is out of range")
+    RETURN_STRY_OK((Sint32_t)0x80000000)
   }
 #endif /* (fixnum_bits > 32) */
 
-  S_error1(who, "~s is not an integer", x);
-
-  return 0 /* not reached */;
+  RETURN_STRY_ERROR("~s is not an integer")
 }
 
-I32 Sinteger32_value(ptr x) {
-  return S_int32_value("Sinteger32_value", x);
+Sint32_t Sinteger32_value(ptr x) {
+  Sint32_t result;
+  const char* reason;
+  if (Stry_integer32_value(x, &result, &reason)) return result;
+  S_error1("Sinteger32_value", reason, x);
 }
 
 /* -2^63 <= x <= 2^64-1 */
-I64 S_int64_value(char *who, ptr x) {
-  if (Sfixnump(x)) return UNFIX(x);
+IBOOL Stry_integer64_value(ptr x, Sint64_t *val, const char** reason) {
+  if (Sfixnump(x)) RETURN_STRY_OK(UNFIX(x))
 
   if (Sbignump(x)) {
-    iptr xl; U64 u;
+    iptr xl; Suint64_t u;
 
-    if ((xl = BIGLEN(x)) > U64_bigits) S_error1(who, "~s is out of range", x);
+    if ((xl = BIGLEN(x)) > U64_bigits) RETURN_STRY_ERROR("~s is out of range")
 
     u = BIGIT(x,0);
 
@@ -318,19 +301,51 @@ I64 S_int64_value(char *who, ptr x) {
     if (xl == 2) u = (u << bigit_bits) | BIGIT(x,1);
 #endif
 
-    if (!BIGSIGN(x)) return (I64)u;
-    if (u < ((U64)1 << 63)) return -(I64)u;
-    if (u > ((U64)1 << 63)) S_error1(who, "~s is out of range", x);
-    return (I64)0x8000000000000000;
+    if (!BIGSIGN(x)) RETURN_STRY_OK((Sint64_t)u)
+    if (u < ((Suint64_t)1 << 63)) RETURN_STRY_OK(-(Sint64_t)u)
+    if (u > ((Suint64_t)1 << 63)) RETURN_STRY_ERROR("~s is out of range")
+    RETURN_STRY_OK((Sint64_t)0x8000000000000000)
   }
 
-  S_error1(who, "~s is not an integer", x);
-
-  return 0 /* not reached */;
+  RETURN_STRY_ERROR("~s is not an integer")
 }
 
-I64 Sinteger64_value(ptr x) {
+I64 S_int64_value(char *who, ptr x) {
+  Sint64_t result;
+  const char* reason;
+  if (Stry_integer64_value(x, &result, &reason)) return result;
+  S_error1(who, reason, x);
+}
+
+Sint64_t Sinteger64_value(ptr x) {
   return S_int64_value("Sinteger64_value", x);
+}
+
+IBOOL Stry_unsigned_value(ptr x, uptr* val, const char** reason) {
+  iptr tmp;
+  if (Stry_integer_value(x, &tmp, reason)) {
+    *val = (uptr)tmp;
+    return 1;
+  }
+  return 0;
+}
+
+IBOOL Stry_unsigned32_value(ptr x, Suint32_t* val, const char** reason) {
+  Sint32_t tmp;
+  if (Stry_integer32_value(x, &tmp, reason)) {
+    *val = (Suint32_t)tmp;
+    return 1;
+  }
+  return 0;
+}
+
+IBOOL Stry_unsigned64_value(ptr x, Suint64_t* val, const char** reason) {
+  Sint64_t tmp;
+  if (Stry_integer64_value(x, &tmp, reason)) {
+    *val = (Suint64_t)tmp;
+    return 1;
+  }
+  return 0;
 }
 
 ptr Sunsigned(uptr u) { /* convert arg to Scheme integer */
@@ -355,7 +370,7 @@ ptr Sinteger(iptr i) { /* convert arg to Scheme integer */
   }
 }
 
-ptr Sunsigned32(U32 u) { /* convert arg to Scheme integer */
+ptr Sunsigned32(Suint32_t u) { /* convert arg to Scheme integer */
 #if (fixnum_bits > 32)
   return FIX((uptr)u);
 #else
@@ -370,11 +385,11 @@ ptr Sunsigned32(U32 u) { /* convert arg to Scheme integer */
 #endif
 }
 
-ptr Sinteger32(I32 i) { /* convert arg to Scheme integer */
+ptr Sinteger32(Sint32_t i) { /* convert arg to Scheme integer */
 #if (fixnum_bits > 32)
   return FIX((iptr)i);
 #else
-  if (i > most_negative_fixnum && i <= most_positive_fixnum)
+  if (i >= most_negative_fixnum && i <= most_positive_fixnum)
     return FIX((iptr)i);
   else {
     ptr x = FIX(0); iptr xl; IBOOL xs;
@@ -385,7 +400,7 @@ ptr Sinteger32(I32 i) { /* convert arg to Scheme integer */
 #endif
 }
 
-ptr Sunsigned64(U64 u) { /* convert arg to Scheme integer */
+ptr Sunsigned64(Suint64_t u) { /* convert arg to Scheme integer */
   if (u <= most_positive_fixnum)
     return FIX((uptr)u);
   else {
@@ -396,8 +411,8 @@ ptr Sunsigned64(U64 u) { /* convert arg to Scheme integer */
   }
 }
 
-ptr Sinteger64(I64 i) { /* convert arg to Scheme integer */
-  if (i > most_negative_fixnum && i <= most_positive_fixnum)
+ptr Sinteger64(Sint64_t i) { /* convert arg to Scheme integer */
+  if (i >= most_negative_fixnum && i <= most_positive_fixnum)
     return FIX((iptr)i);
   else {
     ptr x = FIX(0); iptr xl; IBOOL xs;
@@ -636,6 +651,9 @@ static ptr big_mul(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL sign) {
   PREPARE_BIGNUM(tc, W(tc),xl+yl)
   for (xi = xl, zp = &BIGIT(W(tc),xl+yl-1); xi-- > 0; ) *zp-- = 0;
 
+  /* account for nested loop: */
+  USE_TRAP_FUEL(tc, xl * yl);
+
   for (yi=yl,yp= &BIGIT(y,yl-1),zp= &BIGIT(W(tc),xl+yl-1); yi-- > 0; yp--, zp--)
     if (*yp == 0)
       *(zp-xl) = 0;
@@ -732,12 +750,12 @@ void S_trunc_rem(ptr tc, ptr origx, ptr y, ptr *q, ptr *r) {
     if (Sfixnump(y)) {
       if (x == FIX(most_negative_fixnum) && y == FIX(-1)) {
         iptr m = most_negative_fixnum /* pull out to avoid bogus Sun C warning */;
-        if (q != (ptr)NULL) *q = Sinteger(-m);
-        if (r != (ptr)NULL) *r = FIX(0);
+        if (q != NULL) *q = Sinteger(-m);
+        if (r != NULL) *r = FIX(0);
         return;
       } else {
-        if (q != (ptr)NULL) *q = FIX((iptr)x / (iptr)y);
-        if (r != (ptr)NULL) *r = (ptr)((iptr)x % (iptr)y);
+        if (q != NULL) *q = FIX((iptr)x / (iptr)y);
+        if (r != NULL) *r = (ptr)((iptr)x % (iptr)y);
         return;
       }
     } else {
@@ -795,11 +813,11 @@ static void big_trunc(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL qs, IBOOL rs
   d = normalize(xp, yp, xl, yl);
 
   if (q == (ptr *)NULL) {
-    for (i = m; i-- > 0 ; xp++) (void) quotient_digit(xp, yp, yl);
+    for (i = m; i-- > 0 ; xp++) (void) quotient_digit(tc, xp, yp, yl);
   } else {
     PREPARE_BIGNUM(tc, W(tc),m)
     p = &BIGIT(W(tc),0);
-    for (i = m; i-- > 0 ; xp++) *p++ = quotient_digit(xp, yp, yl);
+    for (i = m; i-- > 0 ; xp++) *p++ = quotient_digit(tc, xp, yp, yl);
     *q = copy_normalize(tc, &BIGIT(W(tc),0),m,qs);
   }
 
@@ -828,9 +846,12 @@ static INT normalize(bigit *xp, bigit *yp, iptr xl, iptr yl) {
   return shft;
 }
 
-static bigit quotient_digit(bigit *xp, bigit *yp, iptr yl) {
+static bigit quotient_digit(ptr tc, bigit *xp, bigit *yp, iptr yl) {
   bigit *p1, *p2, q, k, b, prod;
   iptr i;
+
+  /* this function is called in loops, so use fuel every time */
+  USE_TRAP_FUEL(tc, yl);
 
   q = qhat(xp, yp);
 
@@ -899,6 +920,8 @@ static ptr big_short_gcd(ptr tc, ptr x, bigit y, iptr xl) {
 
   if (y == 0) return BIGSIGN(x) ? big_negate(tc, x) : x;
 
+  USE_TRAP_FUEL(tc, xl);
+
   for (i = xl, r = 0, xp = &BIGIT(x,0); i-- > 0; )
     EDIV(r, *xp++, y, &q, &r)
 
@@ -933,6 +956,9 @@ static ptr big_gcd(ptr tc, ptr x, ptr y, iptr xl, iptr yl) {
     if (asc+shft >= bigit_bits) shft -= bigit_bits;
     asc += shft;
 
+    /* account for nested loops: */
+    USE_TRAP_FUEL(tc, xl + yl);
+
    /* shift left or right; adjust lengths, xp and yp */
     if (shft < 0) {                /* shift right */
       for (i = yl--, p = yp++, k = 0; i-- > 0; p++) ERSH(-shft,p,&k)
@@ -947,7 +973,7 @@ static ptr big_gcd(ptr tc, ptr x, ptr y, iptr xl, iptr yl) {
     }
 
    /* destructive remainder x = x rem y */
-    for (i = xl-yl+1; i-- > 0; xp++) (void) quotient_digit(xp, yp, yl);
+    for (i = xl-yl+1; i-- > 0; xp++) (void) quotient_digit(tc, xp, yp, yl);
 
    /* strip leading zero bigits.  remainder is at most yl bigits long */
     for (i = yl ; *xp == 0 && i > 0; xp++, i--);
@@ -1030,15 +1056,15 @@ floating-point operations
 
 #ifdef IEEE_DOUBLE
 /* exponent stored + 1024, hidden bit to left of decimal point */
-#define bias 1023
-#define bitstoright 52
-#define m1mask 0xf
-#ifdef WIN32
-#define hidden_bit 0x10000000000000
-#else
-#define hidden_bit 0x10000000000000ULL
-#endif
-#ifdef LITTLE_ENDIAN_IEEE_DOUBLE
+# define bias 1023
+# define bitstoright 52
+# define m1mask 0xf
+# ifdef WIN32
+#  define hidden_bit 0x10000000000000
+# else
+#  define hidden_bit 0x10000000000000ULL
+# endif
+# ifdef LITTLE_ENDIAN_IEEE_DOUBLE
 struct dblflt {
     UINT m4: 16;
     UINT m3: 16;
@@ -1047,7 +1073,7 @@ struct dblflt {
     UINT e: 11;
     UINT sign: 1;
 };
-#else
+# else
 struct dblflt {
     UINT sign: 1;
     UINT e: 11;
@@ -1056,7 +1082,7 @@ struct dblflt {
     UINT m3: 16;
     UINT m4: 16;
 };
-#endif
+# endif
 #endif
 
 double S_random_double(U32 m1, U32 m2, U32 m3, U32 m4, double scale) {
@@ -1120,7 +1146,7 @@ static double big_floatify(ptr tc, ptr x, ptr y, iptr xl, iptr yl, IBOOL sign) {
   p = &BIGIT(W(tc),0);
 
  /* compute 'enough' bigits of the quotient */
-  for (i = enough; i-- > 0; xp++) *p++ = quotient_digit(xp, yp, yl);
+  for (i = enough; i-- > 0; xp++) *p++ = quotient_digit(tc, xp, yp, yl);
 
  /* set k if remainder is nonzero */
   k = 0;
@@ -1313,7 +1339,7 @@ static ptr s_big_ash(ptr tc, bigit *xp, iptr xl, IBOOL sign, iptr cnt) {
     cnt -= whole_bigits * bigit_bits;
 
     /* shift by remaining count to scratch bignum, tracking bits shifted off to the right;
-       prepare a bignum one larger than probably needed, in case we have to deal with a
+       prepare a bignum one large than probably needed, in case we have to deal with a
        carry bit when rounding down for a negative number */
     PREPARE_BIGNUM(tc, W(tc),xl+1)
     p1 = &BIGIT(W(tc), 0);
@@ -1347,7 +1373,7 @@ static ptr s_big_ash(ptr tc, bigit *xp, iptr xl, IBOOL sign, iptr cnt) {
           EADDC(0, *p1, p1, &k)
         if (k) {
           /* add carry bit back; we prepared a large enough bignum,
-             and since all of the middle are zero, we don't have to reshift */
+             and since of all the middle are zero, we don't have to reshift */
           BIGIT(W(tc), xl) = 0;
           BIGIT(W(tc), 0) = 1;
           xl++;
@@ -1478,6 +1504,24 @@ ptr S_big_positive_bit_field(ptr x, ptr fxstart, ptr fxend) {
   }
 
   return copy_normalize(tc, &BIGIT(W(tc), 0), wl, 0);
+}
+
+/* returns a lower bound on the number of trailing 0 bits in the
+   binary representation; the result plus bigit_bits-1 is an
+   upper bound: */
+ptr S_big_trailing_zero_bits(ptr x) {
+  bigit *xp = &BIGIT(x, 0);
+  iptr xl = BIGLEN(x), i;
+
+  for (i = xl; i-- > 0; ) {
+    if (xp[i] != 0)
+      break;
+  }
+
+  i = (xl - 1) - i;
+  i *= bigit_bits;
+
+  return FIX(i);
 }
 
 /* logical operations simulate two's complement operations using the
@@ -1686,6 +1730,15 @@ ptr S_logbitp(ptr k, ptr x) {
   }
 }
 
+/* %ac0 must hold a nonnegative fixnum.  %ts must hold a bignum.  Changes %ts */
+void S_bignum_mask_test(void) {
+  ptr tc = get_thread_context();
+  iptr n = (iptr)AC0(tc);
+  ptr x = TS(tc);
+
+  TS(tc) = big_logbitp(n, x, BIGLEN(x), BIGSIGN(x));
+}
+
 /* similar logic to big_logand */
 
 static ptr big_logbitp(iptr n, ptr x, iptr xl, IBOOL xs) {
@@ -1697,7 +1750,7 @@ static ptr big_logbitp(iptr n, ptr x, iptr xl, IBOOL xs) {
     if (i < 0) return Sfalse;
 
     n = n % bigit_bits;
-    return Sboolean(BIGIT(x,i) & (1 << n));
+    return Sboolean(BIGIT(x,i) & ((bigit)1 << n));
   } else {
     bigit xb;
 
@@ -1830,7 +1883,7 @@ static ptr big_logbit1(ptr tc, ptr origx, iptr n, ptr x, iptr xl, IBOOL xs) {
       *--zp = x1;
       n -= bigit_bits;
     }
-    *--zp = x1 | (1 << n);
+    *--zp = x1 | ((bigit)1 << n);
     for (; i > 0; i -= 1) *--zp = *--xp;
     return copy_normalize(tc, zp, zl, 0);
   } else if (yl > xl) {
