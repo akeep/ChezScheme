@@ -1,7 +1,24 @@
-[![test](https://github.com/cisco/ChezScheme/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cisco/ChezScheme/actions/workflows/test.yml)
+[![test](https://github.com/cisco/ChezScheme/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cisco/ChezScheme/actions/workflows/ci.yml)
 
-Chez Scheme is both a programming language and an implementation
-of that language, with supporting tools and documentation.
+*Tip: Clone this repo with* `git clone --filter=blob:none` *to avoid
+eagerly downloading large boot files for older versions.*
+
+Chez Scheme is both a programming language and an implementation of
+that language, with supporting tools and documentation.
+
+Supported platforms (bytecode interpreter may work for others):
+
+ * Windows: x86, x86_64, AArch64
+ * Mac OS: x86, x86_64, AArch64, PowerPC32
+ * Linux: x86, x86_64, ARMv6, AArch64, RV64G, LoongArch64, PowerPC32
+ * FreeBSD: x86, x86_64, ARMv6, AArch64, PowerPC32
+ * OpenBSD: x86, x86_64, ARMv6, AArch64, PowerPC32
+ * NetBSD: x86, x86_64, ARMv6, AArch64, PowerPC32
+ * Solaris: x86, x86_64
+ * GNU/Hurd: x86, x86_64
+ * Android: ARMv7, AArch64
+ * iOS: AArch64
+ * WebAssembly via Emscripten (bytecode interpreter only)
 
 As a superset of the language described in the
 [Revised<sup>6</sup> Report on the Algorithmic Language Scheme](http://www.r6rs.org)
@@ -50,11 +67,14 @@ The R6RS core of the Chez Scheme language is described in
 which also includes an introduction to Scheme and a set of example programs.
 Chez Scheme's additional language, run-time system, and
 programming environment features are described in the
-[Chez Scheme User's Guide](http://cisco.github.io/ChezScheme/csug9.5/csug.html).
+[Chez Scheme User's Guide](http://cisco.github.io/ChezScheme/csug/csug.html).
 The latter includes a shared index and a shared summary of forms,
 with links where appropriate to the former, so it is often the best
 starting point.
 
 Get started with Chez Scheme by [Building Chez Scheme](BUILDING).
 
-For more information see the [Chez Scheme Project Page](https://cisco.github.io/ChezScheme/).
+For more information about the implementation and a guide to modifying
+Chez Scheme, see [implementation notes](IMPLEMENTATION.md).
+
+For more information on Chez Scheme, see the [Chez Scheme Project Page](https://cisco.github.io/ChezScheme/).

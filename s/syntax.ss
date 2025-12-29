@@ -1,12 +1,12 @@
 ;;; syntax.ss
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -442,7 +442,7 @@
 
 (define generate-id
   (lambda (sym)
-    (gensym (symbol->string sym))))
+    ((current-generate-id) sym)))
 
 (define make-token:sym
   (lambda (token sym)
@@ -475,7 +475,7 @@
           (if src `(seq (profile ,src) ,e) e))
         e)))
 
-(module (build-lambda build-library-case-lambda build-case-lambda)
+(module (build-lambda build-lambda/lift-barrier build-library-case-lambda build-case-lambda)
   (define build-clause
     (lambda (fmls body)
       (let f ((ids fmls) (n 0))
@@ -502,6 +502,12 @@
          `(case-lambda ,(make-preinfo-lambda (ae->src ae))
             ,(build-clause vars exp)))))
 
+  (define build-lambda/lift-barrier
+    (lambda (ae vars exp)
+      (build-profile ae
+        `(case-lambda ,(make-preinfo-lambda (ae->src ae) #f #f #f (constant code-flag-lift-barrier))
+           ,(build-clause vars exp)))))
+
   (define build-case-lambda
     (lambda (ae clauses)
       (build-profile ae
@@ -518,12 +524,16 @@
                              [(clause (,x* ...) ,interface ,body) interface]))
                       clauses))
             ($oops #f "libspec interface mismatch ~s" libspec))
-          `(case-lambda ,(make-preinfo-lambda (ae->src ae) #f libspec) ,clauses ...))))))
+          `(case-lambda ,(make-preinfo-lambda (ae->src ae) #f libspec (symbol->string (libspec-name libspec))) ,clauses ...))))))
 
 (define build-call
   (lambda (ae e e*)
     (build-profile ae
-      `(call ,(make-preinfo (ae->src ae) #f) ,e ,e* ...))))
+      (let ([flags (if (or (fx>= (optimize-level) 3)
+                           (enable-unsafe-application))
+                       (preinfo-call-mask unchecked)
+                       (preinfo-call-mask))])
+        `(call ,(make-preinfo-call (ae->src ae) #f flags) ,e ,e* ...)))))
 
 (define build-application
   ; used by chi-application.  pulls profile form off e if e is a lambda expression
@@ -566,11 +576,11 @@
     (build-profile ae `(set! ,(ae->src ae) ,var ,exp))))
 
 (define build-cte-optimization-loc
-  (lambda (box exp)
+  (lambda (box exp exts)
     ; box is for cp0 to store optimization info, if it pleases.  the box is eq? to
     ; the box on the system property list for the library global label and
     ; stored in the library/ct-info record for the file.
-    `(cte-optimization-loc ,box ,exp)))
+    `(cte-optimization-loc ,box ,exp ,exts)))
 
 (define build-primitive-reference
   (lambda (ae name)
@@ -654,8 +664,8 @@
               [(void) (and void-okay? `(fp-void))]
               [else
                (cond
-                [($ftd? x) `(fp-ftd ,x)]
-                [($ftd-as-box? x) `(fp-ftd& ,(unbox x))]
+                [($fptd? x) `(fp-fptd ,x)]
+                [($ftd-pair? x) `(fp-ftd& ,(car x) ,(cdr x))]
                 [else #f])])
             ($oops #f "invalid ~a ~a specifier ~s" who what x)))))
 
@@ -818,12 +828,14 @@
          ,(build-sequence no-source init*)))))
 
 (define build-top-library/ct
-  (lambda (uid export-id* import-code* visit-code*)
+  (lambda (uid export-id* interface import-code* visit-code*)
     (with-output-language (Lexpand ctLibrary)
       `(library/ct ,uid
          (,export-id* ...)
-         ,(build-lambda no-source '()
-            (build-sequence no-source import-code*))
+         ,(build-case-lambda no-source ;; case-lambda to simplify bootstrapping
+            (list
+             (list '() (build-sequence no-source import-code*))
+             (list (list (gen-var 'ignored)) (build-data no-source interface))))
          ,(if (null? visit-code*)
                 (build-primref 3 'void)
                 (build-lambda no-source '()
@@ -831,17 +843,28 @@
 
 (define build-library-body
   (lambda (ae labels boxes vars val-exps body-exp)
-    (build-letrec* ae vars val-exps
-      (fold-right
-        (lambda (label box var body)
-          (if label
-              `(seq
-                 ,(build-global-assignment no-source label
-                    (build-cte-optimization-loc box
-                      (build-lexical-reference no-source var)))
-                 ,body)
-              body))
-        body-exp labels boxes vars))))
+    (let ([exts (build-library-exts labels vars)])
+      (build-letrec* ae vars val-exps
+        (fold-right
+          (lambda (label box var body)
+            (if label
+                `(seq
+                   ,(build-global-assignment no-source label
+                      (build-cte-optimization-loc box
+                        (build-lexical-reference no-source var)
+                        exts))
+                   ,body)
+                body))
+          body-exp labels boxes vars)))))
+
+(define (build-library-exts labels vars)
+  (fold-left (lambda (exts label var)
+               (if label
+                   (cons (cons var label) exts)
+                   exts))
+             '()
+             labels
+             vars))
 
 (define build-lexical-var
   (lambda (ae id)
@@ -1127,6 +1150,14 @@
           (unannotate (syntax-object-expression x))
           (join-marks (wrap-marks w) (wrap-marks (syntax-object-wrap x))))
         (values (unannotate x) (wrap-marks w)))))
+
+(define id->unprefixed-id
+  (lambda (id)
+    (let* ([sym (id-sym-name id)]
+           [unprefixed-sym ($sgetprop sym '*unprefixed* sym)])
+      (if (eq? sym unprefixed-sym)
+          id
+          (make-syntax-object unprefixed-sym (syntax-object-wrap id))))))
 
 ;;; syntax object wraps
 
@@ -2665,7 +2696,7 @@
                             (make-ctdesc import-req* visit-visit-req* visit-req* #t #t '() #f #f)
                             (make-rtdesc invoke-req* #t
                               (top-level-eval-hook
-                                (build-lambda no-source '()
+                                (build-lambda/lift-barrier no-source '()
                                   (build-library-body no-source dl* db* dv* de*
                                     (build-sequence no-source `(,@inits ,(build-void)))))))))
 
@@ -2706,6 +2737,8 @@
                                                       (cons label ls)
                                                       ls)))
                                      '() env*)
+                                   ; interface
+                                   (binding-value interface-binding)
                                    ; import code
                                    `(,(build-cte-install bound-id (build-data no-source interface-binding) '*system*)
                                      ,@(let ([clo* (fold-left (lambda (clo* dl db)
@@ -3473,7 +3506,12 @@
 
 (define residualize-invoke-requirements
   (case-lambda
-    [(code) (residualize-invoke-requirements '() (require-visit) (require-invoke) code)]
+    [(code) (residualize-invoke-requirements '()
+                                             (require-visit)
+                                             (if (expand-omit-library-invocations)
+                                                 '()
+                                                 (require-invoke))
+                                             code)]
     [(import* visit* invoke* code)
      (build-sequence no-source
        `(,@(map (build-requirement '$import-library) import*)
@@ -4250,7 +4288,7 @@
            (and (not std?) (id? #'mid))
            (determine-module-imports "module" #'mid #'mid #'mid)]
           [(?library-reference lr)
-           (sym-kwd? ?library-reference library-reference)
+           (sym-kwd? ?library-reference library)
            (let-values ([(mid tid) (lookup-library #'lr)])
              (determine-module-imports "library" #'lr mid tid))]
           [lr (let-values ([(mid tid) (lookup-library #'lr)])
@@ -4568,11 +4606,11 @@
     (module (make-root insert-path delete-path search-path list-paths)
       (define-record-type dir
         (fields (immutable name) (immutable dir*) (immutable file*))
-        (nongenerative)
+        (nongenerative #{dir htcavk0jv3uhhtakfluarlapg-0})
         (sealed #t))
       (define-record-type file
         (fields (immutable name) (immutable lib))
-        (nongenerative)
+        (nongenerative #{file htcavk0jv3uhhtakfluarlapg-1})
         (sealed #t))
       (define make-root (lambda () (make-dir "root" '() '())))
       (define insert-path
@@ -4658,7 +4696,12 @@
         [() (list-paths root)]
         [(root) (list-paths root)]))
     (define loaded-libraries-root
-      (lambda () root)))
+      (lambda () root))
+    ;; for bootstrapping via "reboot.ss":
+    (set! $loaded-libraries
+      (case-lambda
+        [() root]
+        [(r) (set! root r)])))
 
   (define install-library/ct-desc
     (lambda (path version uid outfn importer visible? ctdesc)
@@ -4744,14 +4787,10 @@
              e1 e2 ...)]))
       (define make-path
         (lambda (dir rpath ext)
-          (if (or (string=? dir "") (string=? dir "."))
+          (if (string=? dir ".")
               (format "~a~a" rpath ext)
-              (format
-                (if (directory-separator? (string-ref dir (fx- (string-length dir) 1)))
-                    "~a~a~a"
-                    "~a/~a~a")
-                dir rpath ext))))
-      (let ([rpath (format "~a~{/~a~}" (car path) (cdr path))])
+              (path-build dir (format "~a~a" rpath ext)))))
+      (let ([rpath (fold-left (lambda (dir elem) (path-build dir (symbol->string elem))) (symbol->string (car path)) (cdr path))])
         (let dloop ([dir* (if (path-absolute? rpath)
                               (with-message (format "ignoring library-directories since ~s is absolute" rpath)
                                 '(("" . "")))
@@ -4909,12 +4948,12 @@
                     ($oops who "loading ~a did not define library ~s" obj-path path))]))))
       (define do-load-library-src-or-obj
         (lambda (src-path obj-path)
-          (define (load-source) 
+          (define (load-source)
             (with-message "object file is out-of-date"
               (with-message (format "loading source file ~s" src-path)
                 (do-load-library src-path 'load))))
-          (let ([obj-path-mod-time (file-modification-time obj-path)])
-            (if (time>=? obj-path-mod-time (file-modification-time src-path))
+          (let ([obj-path-mod-time (library-modification-time obj-path)])
+            (if (time>=? obj-path-mod-time (library-modification-time src-path))
                 ; NB: combine with $maybe-compile-file
                 (let ([rcinfo (guard (c [else (with-message (with-output-to-string
                                                               (lambda ()
@@ -4935,7 +4974,7 @@
                                       (lambda (x)
                                         (lambda ()
                                           (and (file-exists? x)
-                                               (time<=? (file-modification-time x) obj-path-mod-time))))))))
+                                               (time<=? (library-modification-time x) obj-path-mod-time))))))))
                                (recompile-info-include-req* rcinfo))))
                       ; NB: calling load-deps insures that we'll reload obj-path if one of
                       ; the deps has to be reloaded, but it will miss other libraries that might have
@@ -5098,6 +5137,12 @@
          (do-lookup (datum (dir-id ... file-id)) #'file-id (datum version-ref))]
         [_ (syntax-error name "invalid library reference")])))
 
+  (define library-modification-time
+    (lambda (fn)
+      (if (eq? (library-timestamp-mode) 'modification-time)
+          (file-modification-time fn)
+          (make-time 'time-utc 0 0))))
+
   (set! import-notify
     ($make-thread-parameter #f
       (lambda (x) (and x #t))))
@@ -5127,6 +5172,18 @@
   (set! library-list
     (lambda ()
       (list-loaded-libraries)))
+
+  (set-who! library-timestamp-mode
+    ($make-thread-parameter 'modification-time
+      (lambda (x)
+        (unless (or (eq? x 'modification-time)
+                    (eq? x 'exists))
+          ($oops who "~s is not a timestamp mode" x))
+        x)))
+
+  (set! expand-omit-library-invocations
+    ($make-thread-parameter #f
+      (lambda (v) (and v #t))))
 
   (set-who! verify-loadability
     (lambda (situation . input*)
@@ -5165,7 +5222,7 @@
                 (let loop ([rlpinfo* '()])
                   (let ([x (fasl-read ip situation)])
                     (if (or (library-info? x) (program-info? x))
-                        (loop (cons x rlpinfo*)) 
+                        (loop (cons x rlpinfo*))
                         (begin (close-port ip) (reverse rlpinfo*))))))))))
       (unless (memq situation '(load visit revisit)) ($oops who "invalid situation ~s; should be one of load, visit, or revisit" situation))
       (let-values ([(libdirs* fn*) (parse-inputs input*)])
@@ -5319,8 +5376,20 @@
     (set-who! library-exports
       (lambda (libref)
         (let* ([binding (lookup-global (get-lib who libref))]
-               [iface (get-indirect-interface (binding-value binding))])
-          (unless (and (eq? (binding-type binding) '$module) (interface? iface))
+               [iface
+                (case (binding-type binding)
+                 [($module) (get-indirect-interface (binding-value binding))]
+                 [(global)
+                  (let ([desc (get-library-descriptor (binding-value binding))])
+                    (and desc (libdesc-visible? desc)
+                         (cond
+                          [(libdesc-import-code desc) =>
+                           (lambda (import-code)
+                             (guard (c [else #f])
+                               (import-code 'get-iface)))]
+                          [else #f])))]
+                 [else #f])])
+          (unless (interface? iface)
             ($oops who "unexpected binding ~s" binding))
           (let* ([exports (interface-exports iface)]
                  [n (vector-length exports)])
@@ -5450,7 +5519,7 @@
                     (for-each (lambda (req) (import-library (libreq-uid req))) (libdesc-import-req* desc))
                     (p)))]))]
           [else ($oops #f "library ~:s is not defined" uid)])))
-  
+
     ; invoking or visiting a possibly unloaded library occurs in two separate steps:
     ;   1. load library and all dependencies first, recompiling or reloading if requested and required
     ;   2. invoke or visit the library and dependencies
@@ -5499,8 +5568,8 @@
                  e1 e2 ...)]))
           (unless $compiler-is-loaded? ($oops '$maybe-compile-file "compiler is not loaded"))
           (if (file-exists? ofn)
-              (let ([ofn-mod-time (file-modification-time ofn)])
-                (if (time>=? ofn-mod-time (with-new-who who (lambda () (file-modification-time ifn))))
+              (let ([ofn-mod-time (library-modification-time ofn)])
+                (if (time>=? ofn-mod-time (with-new-who who (lambda () (library-modification-time ifn))))
                     (with-message "object file is not older"
                       (let ([rcinfo (guard (c [else (with-message (with-output-to-string
                                                                     (lambda ()
@@ -5520,7 +5589,7 @@
                                           (lambda (x)
                                             (lambda ()
                                               (and (file-exists? x)
-                                                   (time<=? (file-modification-time x) ofn-mod-time))))))))
+                                                   (time<=? (library-modification-time x) ofn-mod-time))))))))
                                    (recompile-info-include-req* rcinfo)))
                             (if (compile-imported-libraries)
                                 (guard (c [(and ($recompile-condition? c) (eq? ($recompile-importer-path c) #f))
@@ -5539,7 +5608,7 @@
                                             [else
                                               (let-values ([(src-path obj-path obj-exists?) (library-search who path (library-directories) (library-extensions))])
                                                 (and obj-exists?
-                                                     (time<=? (file-modification-time obj-path) ofn-mod-time)))])))
+                                                     (time<=? (library-modification-time obj-path) ofn-mod-time)))])))
                                       (recompile-info-import-req* rcinfo))
                                     #f
                                     (handler ifn ofn)))
@@ -5565,7 +5634,7 @@
   (lambda (uid dl* db* dv* de* body)
     (build-primcall no-source 3 '$install-library/rt-code
       (build-data no-source uid)
-      (build-lambda no-source '()
+      (build-lambda/lift-barrier no-source '()
         (build-library-body no-source dl* db* dv* de* body)))))
 
 (let ()
@@ -5573,8 +5642,8 @@
    ; "stuff^...", ^ is ; under windows : otherwise
    ; stuff -> src-dir^^src-dir | src-dir
    ; ends with ^, tail is default-ls, otherwise ()
-    (define sep (if-feature windows #\; #\:))
-    (let ([n (string-length s)])
+    (let ([sep ($separator-character)]
+          [n (string-length s)])
       (define (s0 i)
         (if (fx= i n)
             '()
@@ -5831,7 +5900,7 @@
                        [else (put-global-definition-hook s b)])))])
              ; add system bindings to other modules as appropriate
               (cond
-                [(any-set? (prim-mask (or keyword system-keyword)) m)
+               [(any-set? (prim-mask (or keyword system-keyword)) m)
                  (let ([id (make-resolved-id s (wrap-marks top-wrap) s)])
                    (cond
                      [(any-set? (prim-mask keyword) m)
@@ -5839,13 +5908,14 @@
                       (store-global-subst id '*top* '())
                       (cond
                         [(any-set? (prim-mask r5rs) m)
-                         (store-global-subst id '*r5rs* '())
-                         (store-global-subst id '*r5rs-syntax* '())
-                         (cond
-                           [(any-set? (prim-mask ieee) m)
-                            (store-global-subst id '*ieee* '())
-                            (repartition id #t #t #t #t)]
-                           [else (repartition id #t #t #f #t)])]
+                         (let ([unprefixed-id (id->unprefixed-id id)])
+                           (store-global-subst unprefixed-id '*r5rs* '())
+                           (store-global-subst unprefixed-id '*r5rs-syntax* '())
+                           (cond
+                             [(any-set? (prim-mask ieee) m)
+                              (store-global-subst unprefixed-id '*ieee* '())
+                              (repartition id #t #t #t #t)]
+                             [else (repartition id #t #t #f #t)]))]
                         [else (repartition id #f #f #f #t)])]
                      [else (repartition id #f #f #f #f)]))]
                 [(any-set? (prim-mask (or primitive system)) m)
@@ -5857,12 +5927,13 @@
                       (store-global-subst id '*top* '())
                       (cond
                         [(any-set? (prim-mask r5rs) m)
-                         (store-global-subst id '*r5rs* '())
-                         (cond
-                           [(any-set? (prim-mask ieee) m)
-                            (store-global-subst id '*ieee* '())
-                            (repartition id #f #t #t #t)]
-                           [else (repartition id #f #t #f #t)])]
+                         (let ([unprefixed-id (id->unprefixed-id id)])
+                           (store-global-subst unprefixed-id '*r5rs* '())
+                           (cond
+                             [(any-set? (prim-mask ieee) m)
+                              (store-global-subst unprefixed-id '*ieee* '())
+                              (repartition id #f #t #t #t)]
+                             [else (repartition id #f #t #f #t)]))]
                         [else (repartition id #f #f #f #t)])]
                      [else (repartition id #f #f #f #f)]))]
                 [else (partition (cdr ls) r5rs-syntax r5rs ieee scheme system)]))))))
@@ -5964,6 +6035,13 @@
       (syntax-case e ()
          ((_ e) (build-data ae (strip (syntax e) w)))
          (_ (syntax-error (source-wrap e w ae))))))
+
+(global-extend 'core 'quote-syntax
+  (lambda (e r w ae)
+    (let ([e (source-wrap e w ae)])
+      (syntax-case e ()
+         ((_ e) (build-data no-source (syntax e)))
+         (_ (syntax-error e))))))
 
 (global-extend 'core 'syntax
   (let ()
@@ -6167,6 +6245,13 @@
        (let-values ([(vars body) (chi-lambda-clause (source-wrap e w ae) (syntax c) r w)])
          (build-lambda ae vars body))))))
 
+(global-extend 'core '$lambda/lift-barrier
+  (lambda (e r w ae)
+    (syntax-case e ()
+      ((_ . c)
+       (let-values ([(vars body) (chi-lambda-clause (source-wrap e w ae) (syntax c) r w)])
+         (build-lambda/lift-barrier ae vars body))))))
+
 (global-extend 'core 'case-lambda
   (lambda (e r w ae)
     (syntax-case e ()
@@ -6328,6 +6413,13 @@
          (unless (source-object? src) (syntax-error src "profile subform is not a source object"))
          (build-input-profile src))])))
 
+(global-extend 'core '$begin-unsafe
+  (lambda (e r w ae)
+    (syntax-case e ()
+      ((_ e1 e2 ...)
+       (parameterize ([optimize-level 3])
+         (chi-sequence #'(e1 e2 ...) r w no-source))))))
+
 (global-extend 'set! 'set! '())
 
 (global-extend 'alias 'alias '())
@@ -6423,12 +6515,16 @@
            (let ([y (gen-var 'tmp)])
              (build-let no-source
                (list y)
-               (list (if (eq? p 'any)
-                         (build-primcall no-source 3 'list
-                           (build-lexical-reference no-source x))
-                         (build-primcall no-source 3 '$syntax-dispatch
-                           (build-lexical-reference no-source x)
-                           (build-data no-source p))))
+               (list (cond
+                       [(eq? p 'any)
+                        (build-primcall no-source 3 'list
+                                        (build-lexical-reference no-source x))]
+                       [(eq? p '_)
+                        (build-data no-source '())]
+                       [else
+                        (build-primcall no-source 3 '$syntax-dispatch
+                                        (build-lexical-reference no-source x)
+                                        (build-data no-source p))]))
                (let-syntax ([y (identifier-syntax
                                  (build-lexical-reference no-source y))])
                  (build-conditional no-source
@@ -7179,6 +7275,13 @@
     (lambda (id datum)
       (d->s id datum who))))
 
+;; for bootstrapping via "reboot.ss":
+(set! $datum->environment-syntax
+  (lambda (sym env)
+    (make-syntax-object sym (make-wrap (wrap-marks top-wrap)
+                                       (cons (env-top-ribcage env)
+                                             (wrap-subst top-wrap))))))
+
 (set! syntax->list
   (lambda (orig-ls)
     (let f ([ls orig-ls])
@@ -7227,7 +7330,9 @@
                       (let ([slow (strip-outer slow)])
                         (if (eq? fast slow)
                             ($oops who "cyclic list structure ~s" x)
-                            (f (cdr fast) (cdr slow)))))]
+                            (if (pair? slow)
+                                (f (cdr fast) (cdr slow))
+                                ($oops who "improper list structure ~s" x)))))]
                    [else ($oops who "improper list structure ~s" x)])))]
             [else ($oops who "improper list structure ~s" x)]))))))
 
@@ -7451,6 +7556,9 @@
 (set! $noexpand?
   (lambda (x)
     (and (pair? x) (equal? (car x) noexpand))))
+
+
+(set! $build-library-exts build-library-exts)
 ))
 
 (current-expand sc-expand)
@@ -8226,9 +8334,9 @@
                    (lambda () expr)
                    (rec define-values-consumer
                      #,(if (or (= (optimize-level) 3) (identifier? #'formals))
-                           #'(lambda formals (vector ffml ...))
+                           #'(lambda formals (immutable-vector ffml ...))
                            #`(case-lambda
-                               [formals (vector ffml ...)]
+                               [formals (immutable-vector ffml ...)]
                                [args #,($make-source-oops #'define-values
                                          "incorrect number of values from rhs"
                                          #'expr)])))))
@@ -8249,6 +8357,20 @@
                              (p y) ...
                              (set! y t) ...))])
                (dynamic-wind #t swap (lambda () e1 e2 ...) swap))))])))
+
+(define-syntax with-continuation-mark
+  (lambda (x)
+    (syntax-case x ()
+      [(_ key val body)
+       #'(let ([k key]
+               [v val])
+           ($call-consuming-continuation-attachment
+            '()
+            (lambda (marks)
+              ($call-setting-continuation-attachment
+               ($update-mark marks k v)
+               (lambda ()
+                 body)))))])))
 
 (define-syntax rec
   (lambda (x)
@@ -8755,16 +8877,16 @@
               ($syntax-match? (cdr pat) (cdr exp)))]))))
 
 (define $fp-filter-type
-  (lambda (type void-okay?)
+  (lambda (type as-result?)
    ; not the same as cmacros filter-type, which allows things like bigit
     (case type
       [(scheme-object double-float single-float
         integer-8 unsigned-8 integer-16 unsigned-16 integer-24 unsigned-24
         integer-32 unsigned-32 integer-40 unsigned-40 integer-48 unsigned-48
         integer-56 unsigned-56 integer-64 unsigned-64
-        boolean fixnum char wchar u8* u16* u32* utf-8 utf-16le utf-16be
-        utf-32le utf-32be) type]
-      [(void) (and void-okay? type)]
+        boolean stdbool fixnum char wchar u8* u16* u32* utf-8 utf-16le utf-16be utf-16
+        utf-32le utf-32be utf-32) type]
+      [(void) (and as-result? type)]
       [(ptr) 'scheme-object]
       [(iptr)
        (constant-case ptr-bits
@@ -8829,13 +8951,15 @@
          [(16)
           (constant-case native-endianness
             [(little) 'utf-16le]
-            [(big) 'utf-16be])]
+            [(big) 'utf-16be]
+            [(unknown) 'utf-16])]
          [(32)
           (constant-case native-endianness
             [(little) 'utf-32le]
-            [(big) 'utf-32be])])]
+            [(big) 'utf-32be]
+            [(unknown) 'utf-32])])]
       [else
-       (and (or ($ftd? type) ($ftd-as-box? type))
+       (and (or ($fptd? type) ($ftd-pair? type))
             type)])))
 
 (define $fp-type->pred
@@ -8848,13 +8972,13 @@
            a))]
       [else
        (case type
-         [(boolean void) '(lambda (id) #t)]
+         [(boolean stdbool void) '(lambda (id) #t)]
          [(char) '(lambda (id) (and (char? id) (fx<= (char->integer id) #xff)))]
          [(wchar)
           (constant-case wchar-bits
             [(16) '(lambda (id) (and (char? id) (fx<= (char->integer id) #xffff)))]
             [(32) '(lambda (id) (char? id))])]
-         [(utf-8 utf-16le utf-16be utf32-le utf32-be)
+         [(utf-8 utf-16le utf-16be utf-16 utf32-le utf32-be utf-32)
           '(lambda (id) (or (not id) (string? id)))]
          [(u8* u16* u32*)
           '(lambda (id) (or (not id) (bytevector? id)))]
@@ -8862,43 +8986,64 @@
          [else ($oops '$fp-type->pred "unrecognized type ~s" type)])])))
 
 (define $filter-conv
-  (lambda (who conv*)
+  (lambda (who conv* num-args)
     (define squawk
       (lambda (x)
         (syntax-error x (format "invalid ~s convention" who))))
-    (let loop ([conv* conv*] [accum '()] [keep-accum '()])
+    (define check-arg-count
+      (lambda (n orig-c)
+        (unless (<= n num-args)
+          (syntax-error orig-c (format "invalid ~s convention with ~a arguments" who num-args)))))
+    (let loop ([conv* conv*] [selected #f] [accum '()] [keep-accum '()])
       (cond
         [(null? conv*) (datum->syntax #'filter-conv keep-accum)]
         [else
          (let* ([orig-c (car conv*)]
-                [c (syntax->datum orig-c)]
-                [c (cond
-                     [(not c) #f]
-                     [(eq? c '__collect_safe) 'adjust-active]
-                     [else
-                      (case ($target-machine)
-                        [(i3nt ti3nt)
-                         (case c
-                           [(__stdcall) 'i3nt-stdcall]
-                           [(__cdecl) #f]
-                           [(__com) 'i3nt-com]
-                           [else (squawk orig-c)])]
-                        [(ppcnt)
-                         (case c
-                           [(__stdcall __cdecl) #f]
-                           [else (squawk orig-c)])]
-                        [else (squawk orig-c)])])])
-           (when (member c accum)
-             (syntax-error orig-c (format "redundant ~s convention" who)))
-           (unless (or (null? accum)
-                       (eq? c 'adjust-active)
-                       (and (eq? 'adjust-active (car accum))
-                            (null? (cdr accum))))
-             (syntax-error orig-c (format "conflicting ~s convention" who)))
-           (loop (cdr conv*) (cons c accum)
-                 (if c
-                     (cons c keep-accum)
-                     keep-accum)))]))))
+                [c (syntax->datum orig-c)])
+           (let-values ([(c select?)
+                         (cond
+                           [(not c) (values #f #f)]
+                           [(eq? c '__collect_safe) (values 'adjust-active #f)]
+                           [(eq? c '__atomic) (values 'atomic #f)]
+                           [(eq? c '__varargs)
+                            (check-arg-count 1 orig-c)
+                            (values (cons 'varargs 1) #f)]
+                           [(and (pair? c) (eq? (car c) '__varargs_after)
+                                 (pair? (cdr c)) (null? (cddr c))
+                                 (let ([i (cadr c)])
+                                   (and (integer? i)
+                                        (exact? i)
+                                        (positive? i))))
+                            (check-arg-count (cadr c) orig-c)
+                            (values (cons 'varargs (cadr c)) #f)]
+                           [else
+                            (values
+                             (case ($target-machine)
+                               [(i3nt ti3nt)
+                                (case c
+                                  [(__stdcall) 'i3nt-stdcall]
+                                  [(__cdecl) #f]
+                                  [(__com) 'i3nt-com]
+                                  [else (squawk orig-c)])]
+                               [(ppcnt)
+                                (case c
+                                  [(__stdcall __cdecl) #f]
+                                  [else (squawk orig-c)])]
+                               [else (squawk orig-c)])
+                             #t)])])
+             (when (or (member c accum)
+                       (and (pair? c) (ormap pair? accum)))
+               (syntax-error orig-c (format "redundant ~s convention" who)))
+             (when (and select? selected)
+               (syntax-error orig-c (format "conflicting ~s convention" who)))
+             (when (and (eq? c 'atomic) (member 'adjust-active keep-accum))
+               (syntax-error orig-c (format "conflicting ~s convention" who)))
+             (when (and (eq? c 'adjust-active) (member 'atomic keep-accum))
+               (syntax-error orig-c (format "conflicting ~s convention" who)))
+             (loop (cdr conv*) (if select? c selected) (cons c accum)
+                   (if c
+                       (cons c keep-accum)
+                       keep-accum))))]))))
 
 (define $make-foreign-procedure
   (lambda (who conv* foreign-name ?foreign-addr type* result-type)
@@ -8906,13 +9051,18 @@
       (define (check-strings-allowed)
         (when (memq 'adjust-active (syntax->datum conv*))
           ($oops who "string argument not allowed with __collect_safe procedure")))
+      (define (check-floats-allowed pos)
+        (let ([va-n (ormap (lambda (conv) (and (pair? conv) (eq? (car conv) 'varargs) (cdr conv)))
+                           (syntax->datum conv*))])
+          (when (and va-n (>= pos va-n))
+            ($oops who "single-float varargs argument not allowed"))))
       (with-syntax ([conv* conv*]
                     [foreign-name foreign-name]
                     [?foreign-addr ?foreign-addr]
                     [(t ...) (generate-temporaries type*)])
         (with-syntax ([(((check ...) (actual ...) (arg ...)) ...)
                        (map
-                         (lambda (type x)
+                         (lambda (type x pos)
                            (with-syntax ([x x])
                              (or (case type
                                    [(boolean)
@@ -8921,6 +9071,11 @@
                                        (#,(constant-case int-bits
                                             [(32) #'integer-32]
                                             [(64) #'integer-64])))]
+                                   [(stdbool)
+                                    #`(()
+                                       ((if x 1 0))
+                                       (#,(constant-case stdbool-bits
+                                            [(8) #'integer-8])))]
                                    [(char)
                                     #`(()
                                        (#,(if unsafe?
@@ -8980,6 +9135,17 @@
                                                         ($fp-string->utf16 x 'big)
                                                         (err ($moi) x)))))
                                        (u16*))]
+                                   [(utf-16)
+                                    (check-strings-allowed)
+                                    #`(()
+                                       ((if (eq? x #f)
+                                            x
+                                            #,(if unsafe?
+                                                  #'($fp-string->utf16 x (native-endianness))
+                                                  #'(if (string? x)
+                                                        ($fp-string->utf16 x (native-endianness))
+                                                        (err ($moi) x)))))
+                                       (u16*))]
                                    [(utf-32le)
                                     (check-strings-allowed)
                                     #`(()
@@ -9002,9 +9168,23 @@
                                                         ($fp-string->utf32 x 'big)
                                                         (err ($moi) x)))))
                                        (u32*))]
+                                   [(utf-32)
+                                    (check-strings-allowed)
+                                    #`(()
+                                       ((if (eq? x #f)
+                                            x
+                                            #,(if unsafe?
+                                                  #'($fp-string->utf32 x (native-endianness))
+                                                  #'(if (string? x)
+                                                        ($fp-string->utf32 x (native-endianness))
+                                                        (err ($moi) x)))))
+                                       (u32*))]
+                                   [(single-float)
+                                    (check-floats-allowed pos)
+                                    #f]
                                    [else #f])
-                                 (if (or ($ftd? type) ($ftd-as-box? type))
-                                     (let ([ftd (if ($ftd? type) type (unbox type))])
+                                 (if (or ($fptd? type) ($ftd-pair? type))
+                                     (let ([ftd (if ($fptd? type) type (cdr type))])
                                        #`(#,(if unsafe? #'() #`((unless (record? x '#,ftd) (err ($moi) x))))
                                           (x)
                                           (#,type)))
@@ -9013,13 +9193,16 @@
                                        #`(#,(if unsafe? #'() #'((unless (pred x) (err ($moi) x))))
                                           (x)
                                           (type)))))))
-                         type* #'(t ...))]
+                         type* #'(t ...) (enumerate type*))]
                       [(result-filter result)
                        (case result-type
                          [(boolean) #`((lambda (x) (not (eq? x 0)))
                                        #,(constant-case int-bits
                                            [(32) #'integer-32]
                                            [(64) #'integer-64]))]
+                         [(stdbool) #`((lambda (x) (not (eq? x 0)))
+                                       #,(constant-case stdbool-bits
+                                           [(8) #'integer-8]))]
                          [(char) #'((lambda (x) (#3%integer->char (#3%fxlogand x #xff)))
                                     unsigned-8)]
                          [(wchar) #`(integer->char
@@ -9029,8 +9212,10 @@
                          [(utf-8) #'((lambda (x) (and x (utf8->string x))) u8*)]
                          [(utf-16le) #'((lambda (x) (and x (utf16->string x 'little #t))) u16*)]
                          [(utf-16be) #'((lambda (x) (and x (utf16->string x 'big #t))) u16*)]
+                         [(utf-16) #'((lambda (x) (and x (utf16->string x (native-endianness) #t))) u16*)]
                          [(utf-32le) #'((lambda (x) (and x (utf32->string x 'little #t))) u32*)]
                          [(utf-32be) #'((lambda (x) (and x (utf32->string x 'big #t))) u32*)]
+                         [(utf-32) #'((lambda (x) (and x (utf32->string x (native-endianness) #t))) u32*)]
                          [(integer-24) #`((lambda (x) (#,(constant-case ptr-bits [(32) #'mod0] [(64) #'fxmod0]) x #x1000000)) integer-32)]
                          [(unsigned-24) #`((lambda (x) (#,(constant-case ptr-bits [(32) #'mod] [(64) #'fxmod]) x #x1000000)) unsigned-32)]
                          [(integer-40) #`((lambda (x) (mod0 x #x10000000000)) integer-64)]
@@ -9041,12 +9226,12 @@
                          [(unsigned-56) #`((lambda (x) (mod x #x100000000000000)) unsigned-64)]
                          [else
                           (cond
-                            [($ftd-as-box? result-type)
+                            [($ftd-pair? result-type)
                              ;; Return void, since an extra first argument receives the result,
                              ;; but tell `$foreign-procedure` that the result is actually an & form
                              #`((lambda (r) (void)) #,(datum->syntax #'foreign-procedure result-type))]
                             [else
-                             #`(values #,(datum->syntax #'foreign-procedure result-type))])])]
+                             #`(begin #,(datum->syntax #'foreign-procedure result-type))])])]
                       [([extra ...] [extra-arg ...] [extra-check ...])
                        ;; When the result type is `(& <ftype>)`, the `$foreign-procedure` result
                        ;; expects an extra argument as a `(* <ftype>)` that it uses to store the
@@ -9054,21 +9239,24 @@
                        ;; explicit for `$foreign-procedure`, and the return type is preserved as-is
                        ;; to let `$foreign-procedure` know that it needs to fill the first argument.
                        (cond
-                         [($ftd-as-box? result-type)
+                         [($ftd-pair? result-type)
                           #`([&-result]
-                             [#,(unbox result-type)]
+                             [#,(cdr result-type)]
                              #,(if unsafe?
                                    #`[]
-                                   #`[(unless (record? &-result '#,(unbox result-type)) (err ($moi) &-result))]))]
+                                   #`[(unless (record? &-result '#,(cdr result-type)) (err ($moi) &-result))]))]
                          [else #'([] [] [])])])
-          #`(let ([p ($foreign-procedure conv* foreign-name ?foreign-addr (extra-arg ... arg ... ...) result)]
+          #`(let ([foreign-addr ?foreign-addr]
                   #,@(if unsafe?
                          #'()
                          #'([err (lambda (who x)
                                    ($oops (or who foreign-name)
-                                     "invalid foreign-procedure argument ~s"
-                                     x))])))
-              (lambda (extra ... t ...) extra-check ... check ... ... (result-filter (p extra ... actual ... ...)))))))))
+                                          "invalid foreign-procedure argument ~s"
+                                          x))])))
+              (let ([p ($foreign-procedure conv* foreign-name foreign-addr (extra-arg ... arg ... ...) result)])
+                (lambda (extra ... t ...)
+                  extra-check ... check ... ...
+                  (result-filter (p extra ... actual ... ...))))))))))
 
 (define-syntax foreign-procedure
   (lambda (x)
@@ -9081,7 +9269,7 @@
       [(_ c ... ?name (arg ...) result)
        (lambda (r)
          ($make-foreign-procedure 'foreign-procedure
-           ($filter-conv 'foreign-procedure #'(c ...))
+           ($filter-conv 'foreign-procedure #'(c ...) (length #'(arg ...)))
            (let ([x (datum ?name)]) (and (string? x) x))
            #'($foreign-entry ?name)
            (map (lambda (x) (filter-type r x #f)) #'(arg ...))
@@ -9097,10 +9285,15 @@
       (define (check-strings-allowed)
         (when (memq 'adjust-active (syntax->datum conv*))
           ($oops who "string result not allowed with __collect_safe callable")))
+      (define (check-floats-allowed pos)
+        (let ([va-n (ormap (lambda (conv) (and (pair? conv) (eq? (car conv) 'varargs) (cdr conv)))
+                           (syntax->datum conv*))])
+          (when (and va-n (>= pos va-n))
+            ($oops who "single-float argument not allowed for __varargs procedure"))))
       (with-syntax ([conv* conv*] [?proc ?proc])
         (with-syntax ([((actual (t ...) (arg ...)) ...)
                        (map
-                        (lambda (type)
+                        (lambda (type pos)
                            (or (case type
                                  [(boolean)
                                   (with-syntax ([(x) (generate-temporaries #'(*))])
@@ -9109,6 +9302,12 @@
                                        (#,(constant-case int-bits
                                             [(32) #'integer-32]
                                             [(64) #'integer-64]))))]
+                                 [(stdbool)
+                                  (with-syntax ([(x) (generate-temporaries #'(*))])
+                                    #`((not (eq? x 0))
+                                       (x)
+                                       (#,(constant-case stdbool-bits
+                                            [(8) #'integer-8]))))]
                                  [(char)
                                   (with-syntax ([(x) (generate-temporaries #'(*))])
                                     #`((#3%integer->char (#3%fxlogand x #xff))
@@ -9136,6 +9335,11 @@
                                     #`((and x (utf16->string x 'big #t))
                                        (x)
                                        (u16*)))]
+                                 [(utf-16)
+                                  (with-syntax ([(x) (generate-temporaries #'(*))])
+                                    #`((and x (utf16->string x (native-endianness) #t))
+                                       (x)
+                                       (u16*)))]
                                  [(utf-32le)
                                   (with-syntax ([(x) (generate-temporaries #'(*))])
                                     #`((and x (utf32->string x 'little #t))
@@ -9144,6 +9348,11 @@
                                  [(utf-32be)
                                   (with-syntax ([(x) (generate-temporaries #'(*))])
                                     #`((and x (utf32->string x 'big #t))
+                                       (x)
+                                       (u32*)))]
+                                 [(utf-32)
+                                  (with-syntax ([(x) (generate-temporaries #'(*))])
+                                    #`((and x (utf32->string x (native-endianness) #t))
                                        (x)
                                        (u32*)))]
                                  [(integer-24)
@@ -9186,16 +9395,23 @@
                                     #`((mod x #x100000000000000)
                                        (x)
                                        (unsigned-64)))]
+                                 [(single-float)
+                                  (check-floats-allowed pos)
+                                  #f]
                                  [else #f])
                                (with-syntax ([(x) (generate-temporaries #'(*))])
                                  #`(x (x) (#,(datum->syntax #'foreign-callable type))))))
-                         type*)]
+                         type* (enumerate type*))]
                       [(result-filter result [extra-arg ...] [extra ...])
                        (case result-type
                          [(boolean) #`((lambda (x) (if x 1 0))
                                        #,(constant-case int-bits
                                            [(32) #'integer-32]
                                            [(64) #'integer-64])
+                                       [] [])]
+                         [(stdbool) #`((lambda (x) (if x 1 0))
+                                       #,(constant-case stdbool-bits
+                                           [(8) #'integer-8])
                                        [] [])]
                          [(char)
                           #`((lambda (x)
@@ -9262,6 +9478,18 @@
                                                (err x)))))
                              u16*
                              [] [])]
+                         [(utf-16)
+                          (check-strings-allowed)
+                          #`((lambda (x)
+                               (if (eq? x #f)
+                                   x
+                                   #,(if unsafe?
+                                         #'($fp-string->utf16 x (native-endianness))
+                                         #'(if (string? x)
+                                               ($fp-string->utf16 x (native-endianness))
+                                               (err x)))))
+                             u16*
+                             [] [])]
                          [(utf-32le)
                           (check-strings-allowed)
                           #`((lambda (x)
@@ -9286,22 +9514,34 @@
                                                (err x)))))
                              u32*
                              [] [])]
+                         [(utf-32)
+                          (check-strings-allowed)
+                          #`((lambda (x)
+                               (if (eq? x #f)
+                                   x
+                                   #,(if unsafe?
+                                         #'($fp-string->utf32 x (native-endianness))
+                                         #'(if (string? x)
+                                               ($fp-string->utf32 x (native-endianness))
+                                               (err x)))))
+                             u32*
+                             [] [])]
                          [else
                           (cond
-                            [($ftd? result-type)
+                            [($fptd? result-type)
                              (with-syntax ([type (datum->syntax #'foreign-callable result-type)])
                                #`((lambda (x)
                                     #,@(if unsafe? #'() #'((unless (record? x 'type) (err x))))
                                     x)
                                   type
                                   [] []))]
-                            [($ftd-as-box? result-type)
+                            [($ftd-pair? result-type)
                              ;; callable receives an extra pointer argument to fill with the result;
                              ;; we add this type to `$foreign-callable` as an initial address argument,
                              ;; which may be actually provided by the caller or synthesized by the
                              ;; back end, depending on the type and architecture
                              (with-syntax ([type (datum->syntax #'foreign-callable result-type)]
-                                           [ftd (datum->syntax #'foreign-callable (unbox result-type))])
+                                           [ftd (datum->syntax #'foreign-callable (cdr result-type))])
                                #`((lambda (x) (void)) ; callable result is ignored
                                   type
                                   [ftd]
@@ -9323,7 +9563,9 @@
                       "invalid return value ~s from ~s"
                       x p))
                   #,@(if unsafe? #'() #'((unless (procedure? p) ($oops 'foreign-callable "~s is not a procedure" p))))
-                  (lambda (extra ... t ... ...) (result-filter (p extra ... actual ...))))
+                  (lambda (extra ... t ... ...)
+                    ($event-trap-check) ; ensure eventual `($event)` in the case of many short callbacks
+                    (result-filter (p extra ... actual ...))))
                 (extra-arg ... arg ... ...)
                 result)))))))
 
@@ -9338,7 +9580,7 @@
       [(_ c ... ?proc (arg ...) result)
        (lambda (r)
          ($make-foreign-callable 'foreign-callable
-           ($filter-conv 'foreign-callable #'(c ...))
+           ($filter-conv 'foreign-callable #'(c ...) (length #'(arg ...)))
            #'?proc
            (map (lambda (x) (filter-type r x #f)) #'(arg ...))
            (filter-type r #'result #t)))])))
@@ -9741,7 +9983,7 @@
                    (begin
                      (when (any-set? keys-seen (clause-key nongenerative))
                        (syntax-error src "record definition has multiple nongenerative clauses"))
-                     (Mclause parse-clauses ([%uid (datum->syntax #'* (gensym (symbol->string (syntax->datum name))))])
+                     (Mclause parse-clauses ([%uid (datum->syntax #'* ((current-generate-id) (syntax->datum name)))])
                        (set-flags keys-seen (clause-key nongenerative))
                        (cdr clause*)))]
                   [(nongenerative id)
@@ -10205,7 +10447,6 @@
       (case-lambda
         [(ifn bip) (make-source-file-descriptor ifn bip #f)]
         [(ifn bip reset?)
-         (unless (string? ifn) ($oops who "~s is not a string" ifn))
          (unless (and (input-port? bip) (binary-port? bip))
            ($oops who "~s is not a binary input port" bip))
          (when reset?
@@ -10214,7 +10455,6 @@
          ($source-file-descriptor ifn bip reset?)])))
   (set-who! source-file-descriptor
     (lambda (path checksum)
-      (unless (string? path) ($oops who "~s is not a string" path))
       (unless (if (fixnum? checksum) (fx>= checksum 0) (and (bignum? checksum) ($bigpositive? checksum)))
         ($oops who "~s is not an exact nonnegative integer" checksum))
       (%make-source-file-descriptor path (ash checksum -16) (logand checksum #xffff))))

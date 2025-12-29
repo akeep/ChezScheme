@@ -1,12 +1,12 @@
 ;;; 8.ms
 ;;; Copyright 1984-2017 Cisco Systems, Inc.
-;;; 
+;;;
 ;;; Licensed under the Apache License, Version 2.0 (the "License");
 ;;; you may not use this file except in compliance with the License.
 ;;; You may obtain a copy of the License at
-;;; 
+;;;
 ;;; http://www.apache.org/licenses/LICENSE-2.0
-;;; 
+;;;
 ;;; Unless required by applicable law or agreed to in writing, software
 ;;; distributed under the License is distributed on an "AS IS" BASIS,
 ;;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -215,7 +215,7 @@
 
   (begin
     (define $a 'aaa)
-    (define $x 'xxx) 
+    (define $x 'xxx)
     (define-syntax $introduce-module
       (identifier-syntax
         (begin (module $a ($x) (define $x 73))
@@ -564,7 +564,7 @@
     #t)
   (equal? (gp$f) '())
   (equal? (gp$f (1 2 3 4 5) (6 7 8)) '(1 2 3 4 6 7 5 8))
-  (error? 
+  (error?
     (define-syntax gp$g
       (syntax-rules ()
         [(_ x ... y ...) '(x ... y ...)])))
@@ -943,7 +943,7 @@
  ; [
   (error? ($do-one "'(a b (c d])")) ; )
 
-  (error? ($do-one '(let () 
+  (error? ($do-one '(let ()
                       (define-syntax a
                         (lambda (x)
                           (syntax-case x ()
@@ -981,7 +981,7 @@
           (library ($selib1) (export (rename (a $selib1-a)))
             (import (rnrs))
             (define x 0)
-            (define-syntax a 
+            (define-syntax a
               (syntax-rules ()
                 [(_ n) (begin (set! x (+ x n)) x)])))
           (import ($selib1))
@@ -993,7 +993,7 @@
           (library ($selib1) (export (rename (a $selib1-a)))
             (import (rnrs))
             (define x 0)
-            (define-syntax a 
+            (define-syntax a
               (syntax-rules ()
                 [(_) (begin (set! x (+ x 1)) x)])))
           (import ($selib1))
@@ -1178,7 +1178,7 @@
  ; [
   (error? ($do-one "'(a b (c d])")) ; )
 
-  (error? ($do-one '(let () 
+  (error? ($do-one '(let ()
                       (define-syntax a
                         (lambda (x)
                           (syntax-case x ()
@@ -1218,7 +1218,7 @@
           (library ($selib1) (export (rename (a $selib1-a)))
             (import (rnrs))
             (define x 0)
-            (define-syntax a 
+            (define-syntax a
               (syntax-rules ()
                 [(_ n) (begin (set! x (+ x n)) x)])))
           (import ($selib1))
@@ -1230,7 +1230,7 @@
           (library ($selib1) (export (rename (a $selib1-a)))
             (import (rnrs))
             (define x 0)
-            (define-syntax a 
+            (define-syntax a
               (syntax-rules ()
                 [(_) (begin (set! x (+ x 1)) x)])))
           (import ($selib1))
@@ -1449,7 +1449,7 @@
     (define-syntax defconst
       (syntax-rules ()
         ((_ $x e)
-         (anonymous-module (($x t)) 
+         (anonymous-module (($x t))
            (define-syntax $x (identifier-syntax t))
            (define t e)))))
     (defconst $a 3)
@@ -1510,7 +1510,7 @@
     (define-syntax defconst
       (syntax-rules ()
         ((_ $x e)
-         (module (($x t)) 
+         (module (($x t))
            (define-syntax $x (identifier-syntax t))
            (define t e)))))
     (defconst $a 3)
@@ -2594,7 +2594,7 @@
                          (call/cc (lambda (continue) b1 b2 ...))
                          e2
                          (f))))))])))
-      (define ls-in) 
+      (define ls-in)
       (define ls-out)
       (for ((begin (set! ls-in '(a b c d e f g h i j)) (set! ls-out '()))
             (not (null? ls-in))
@@ -2632,7 +2632,7 @@
     (alias 3 x))
   (eq? (let ((x 2)) (alias y x) y) 2)
   (equal?
-    (let ((x "x"))          
+    (let ((x "x"))
       (define-syntax fool
         (let ()
           (alias y x)
@@ -3417,6 +3417,30 @@
         (import-only A B)
         x))
     'b)
+  (begin
+    (library (for mat) (export x) (import (scheme)) (define x 123))
+    (library (a b c) (export d) (import (scheme)) (define d 27))
+    (library (xd)
+      (export ls)
+      (import (scheme) (library (for mat)) (library (a b c)))
+      (define ls (list x d)))
+    #t)
+  (equal? 123
+    (let ([x 'port])
+      (import (library (for mat)))
+      x))
+  (equal? 27
+    (let ([d 'nile])
+      (import (library (a b c)))
+      d))
+  (equal? 27
+    (let ([d 'nile])
+      (import (a b c))
+      d))
+  (equal? '(123 27)
+    (let ([x 'treme] [d 'nile])
+      (import (xd))
+      ls))
 )
 
 (mat export ; test stand-alone export form
@@ -4386,7 +4410,7 @@
       (let* ([ss.out (with-output-to-string (lambda () (load "testfile.ss")))]
              [cf.out (with-output-to-string (lambda () (compile-file "testfile.ss")))]
              [so.out (with-output-to-string (lambda () (load "testfile.so")))])
-        (let ([actual 
+        (let ([actual
                (list
                  ss.out
                  (substring cf.out
@@ -4512,7 +4536,7 @@
   ($foofrah
     '(begin
        (eval-when (compile load eval)
-         (module const (get put) 
+         (module const (get put)
            (define ht (make-eq-hashtable))
            (define get (lambda (name) (hashtable-ref ht name 0)))
            (define put (lambda (name value) (hashtable-set! ht name value)))))
@@ -4530,7 +4554,7 @@
   ($foofrah
     '(begin
        (eval-when (compile load eval)
-         (module const (get put) 
+         (module const (get put)
            (define ht (make-eq-hashtable))
            (define get (lambda (name) (hashtable-ref ht name 0)))
            (define put (lambda (name value) (hashtable-set! ht name value)))))
@@ -4550,7 +4574,7 @@
   ($foofrah
     '(begin
        (eval-when (compile load eval)
-         (module const (get put) 
+         (module const (get put)
            (define ht (make-eq-hashtable))
            (define get (lambda (name) (hashtable-ref ht name 0)))
            (define put (lambda (name value) (hashtable-set! ht name value)))))
@@ -4569,7 +4593,7 @@
   ($foofrah
     '(begin
        (eval-when (compile eval)
-         (module const (get put) 
+         (module const (get put)
            (define ht (make-eq-hashtable))
            (define get (lambda (name) (hashtable-ref ht name 0)))
            (define put (lambda (name value) (hashtable-set! ht name value)))))
@@ -4591,7 +4615,7 @@
          (identifier-syntax
            (begin
              (eval-when (compile eval)
-               (module const (get put) 
+               (module const (get put)
                  (define ht (make-eq-hashtable))
                  (define get (lambda (name) (hashtable-ref ht name 0)))
                  (define put (lambda (name value) (hashtable-set! ht name value)))))
@@ -4611,7 +4635,7 @@
   (begin
     (with-output-to-file "testfile-lib-c.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-lib-c)
              (export y)
              (import (chezscheme) (testfile-lib-a))
@@ -4620,7 +4644,7 @@
       'replace)
     (with-output-to-file "testfile-test-ac.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(begin
              (library (testfile-lib-a)
                (export x)
@@ -4643,7 +4667,7 @@
   (begin
     (with-output-to-file "testfile.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(let-syntax ([a (lambda (x) 0)])
              (define-syntax $foo (lambda (x) #'cons)))))
       'replace)
@@ -4654,7 +4678,7 @@
   (begin
     (with-output-to-file "testfile.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(begin
              (define-syntax $foo-a (lambda (x) 0))
              (define-syntax $foo (lambda (x) #'cons)))))
@@ -4678,7 +4702,7 @@
   (begin
     (with-output-to-file "testfile-tlb-a1.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-tlb-a1)
              (export tlb-a1-rats)
              (import (rnrs))
@@ -4686,7 +4710,7 @@
       'replace)
     (with-output-to-file "testfile-tlb-a2.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(define-syntax tlb-a2-foo
              (let ()
                (import (testfile-tlb-a1))
@@ -4694,7 +4718,7 @@
       'replace)
     (with-output-to-file "testfile-tlb-a3.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(let-syntax ([silly (lambda (x)
                                  (import (testfile-tlb-a1))
                                  (syntax-case x ()
@@ -4703,7 +4727,7 @@
       'replace)
     (with-output-to-file "testfile-tlb-a4.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(module (tlb-a4-pie)
              (import (testfile-tlb-a1))
              (define-syntax tlb-a4-pie
@@ -4711,13 +4735,13 @@
       'replace)
     (with-output-to-file "testfile-tlb-a5.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(meta define tlb-a5-spam
              (let () (import (testfile-tlb-a1)) #'(cons tlb-a1-rats 5)))))
       'replace)
     (with-output-to-file "testfile-tlb-a6a.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-tlb-a6a)
              (export tlb-a6-fop)
              (import (rnrs) (testfile-tlb-a1))
@@ -4725,7 +4749,7 @@
       'replace)
     (with-output-to-file "testfile-tlb-a6b.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-tlb-a6b)
              (export tlb-a6-alpha)
              (import (rnrs) (testfile-tlb-a6a))
@@ -4738,17 +4762,17 @@
       'replace)
     (with-output-to-file "testfile-tlb-a7.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(define-property spam spam (let () (import (testfile-tlb-a1)) #'(cons tlb-a1-rats 7)))))
       'replace)
     (with-output-to-file "testfile-tlb-a8.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(define tlb-a8-spam (let () (import (testfile-tlb-a1)) #'(cons tlb-a1-rats 8)))))
       'replace)
     (with-output-to-file "testfile-tlb-a9.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(let ()
              (import (testfile-tlb-a1))
              (set! tlb-a9-spam #'(cons tlb-a1-rats 9)))))
@@ -4804,7 +4828,7 @@
   (begin
     (with-output-to-file "testfile-tlb-bQ.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-tlb-bQ)
              (export tlb-bq)
              (import (rnrs))
@@ -4812,7 +4836,7 @@
       'replace)
     (with-output-to-file "testfile-tlb-bA.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-tlb-bA)
              (export tlb-bset-a! tlb-bget-a)
              (import (rnrs))
@@ -5383,7 +5407,7 @@
       ans)
     '(35 54 48))
   (begin
-    (module (mat-meta-zeta) 
+    (module (mat-meta-zeta)
       (meta module frobrat (boz) (define boz 3))
       (define-syntax rot (lambda (x) (import frobrat) boz))
       (define mat-meta-zeta rot))
@@ -5486,7 +5510,7 @@
       (define-syntax y (lambda (z) x))
       (define $meta-z y))
     (equal? $meta-z "jolly"))
-  
+
  ; local tests
   (error? ;=> out-of-context or unbound error
     (let ()
@@ -5525,7 +5549,7 @@
           `(,#'quote (,p ,b))))
       a)
     '(3 4))
-  
+
   (begin
     (define $mm-p "p")
     (define $mm-q "q")
@@ -5560,7 +5584,7 @@
       (c put 7 p)
       (list (c get 1) (c get 2) (c get 7)))
     '("q!" "r!" "p!"))
-  
+
  ; assuming internal-defines-as-letrec* defaults to #t
   (internal-defines-as-letrec*)
  ; following tests assume it's set to #f
@@ -5657,7 +5681,7 @@
         (set! hobbits (cons 'bilbo hobbits)))
       (set! hobbits (cons 'pippin hobbits)))
     (equal? hobbits '(pippin bilbo frodo lobelia merry)))
-  
+
  ; assuming internal-defines-as-letrec* true
   (internal-defines-as-letrec*)
   (begin
@@ -5732,7 +5756,7 @@
     (!y (+ (?y) 1))
     (x values)
     (eq? (?y) 1))
-  
+
  ; test for proper evaluation of meta defines and inits at compile-file time,
  ; visit time, revisit time, and load time
   (begin
@@ -6123,12 +6147,12 @@
         (pretty-print
           '(library (testfile-mctv0) (export get-ctv get-property) (import (chezscheme))
              (define-syntax get-ctv
-               (lambda (x)  
+               (lambda (x)
                  (lambda (r)
                    (syntax-case x ()
                      [(_ q) #`'#,(datum->syntax #'* (r #'q))]))))
              (define-syntax get-property
-               (lambda (x)  
+               (lambda (x)
                  (lambda (r)
                    (syntax-case x ()
                      [(_ q prop) #`'#,(datum->syntax #'* (r #'q #'prop))])))))))
@@ -6367,7 +6391,7 @@
   (begin
     (library (dp get-property) (export get-property) (import (scheme))
       (define-syntax get-property
-        (lambda (x)  
+        (lambda (x)
           (lambda (r)
             (syntax-case x ()
               [(_ q prop) #`'#,(datum->syntax #'* (r #'q #'prop))])))))
@@ -6383,7 +6407,7 @@
     '(spamgle . #f))
   (equal?
     (let ()
-      (import scheme) 
+      (import scheme)
       (cons (get-property cons frotz) (get-property cons fratz)))
     (if (free-identifier=? #'cons (let () (import scheme) #'cons))
         '(spamgle . #f)
@@ -6408,12 +6432,12 @@
     '(#f . #f))
   (equal?
     (let ()
-      (import scheme) 
+      (import scheme)
       (cons (get-property cons frotz) (get-property cons fratz)))
     '(#f . #f))
   (equal?
     (let ()
-      (import scheme) 
+      (import scheme)
       (define-property list type "procedure")
       (list (get-property list type) (get-property car type)))
     '("procedure" #f))
@@ -6530,11 +6554,11 @@
         (get-property x rats)
         x))
     (equal?
-      (get-output-string dp-out) 
+      (get-output-string dp-out)
       "\"x-spam\" \"x-frob\" #f 444\n"))
   (equal?
     (let ()
-      (import dp-m1) 
+      (import dp-m1)
       (list
         (get-property x spam)
         (get-property x frob)
@@ -6553,13 +6577,13 @@
         (get-property dp-out rats)))
     (and
       (equal?
-        (get-output-string dp-out) 
+        (get-output-string dp-out)
         "\"dp-out-spam\" \"dp-out-frob\" #f\n")
       (not (get-property dp-out spam))
       (not (get-property dp-out frob))))
   (equal?
     (let ()
-      (import dp-m1) 
+      (import dp-m1)
       (list
         (get-property x spam)
         (get-property x frob)
@@ -7334,7 +7358,7 @@
       'replace)
     (with-output-to-file "testfile-C.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(library (testfile-C)
              (export)
              (import (scheme) (testfile-A) (testfile-B))
@@ -7342,7 +7366,7 @@
       'replace)
     (for-each separate-compile '(A B C))
     #t)
-  (equal? 
+  (equal?
     (let ()
       (import (testfile-C))
       (list $testfile-A-x (get-property $testfile-A-x $testfile-A-prop-id)))
@@ -8472,7 +8496,7 @@
       'replace)
     (with-output-to-file "testfile-a3-9.ss"
       (lambda ()
-        (pretty-print 
+        (pretty-print
           '(let ()
              (import (scheme) (testfile-a3-8))
              (printf "inside testfile-a3-9\n"))))
@@ -8861,7 +8885,7 @@
            (define x #f)
            (error #f "failed to load library (invoke-fail)"))
          (guard (e [else
-                     (guard (e2 [else 
+                     (guard (e2 [else
                                   (display-condition e) (newline)
                                   (display-condition e2) (newline)])
                        (eval 'x (environment '(chezscheme) '(invoke-fail))))])
@@ -8878,7 +8902,7 @@
            (define x #f)
            (define y (eval '(if x 5 10) (environment '(chezscheme) '(invoke-cyclic)))))
          (guard (e [else
-                     (guard (e2 [else 
+                     (guard (e2 [else
                                   (display-condition e) (newline)
                                   (display-condition e2) (newline)])
                        (eval 'x (environment '(chezscheme) '(invoke-cyclic))))])
@@ -9306,6 +9330,43 @@
     '(#t . #t))
   (equal? (let () (import (testfile-clo-3a)) (h)) (void))
   (not (let () (import (testfile-clo-3a)) (g)))
+
+  ; testing support of procedures with improper formals
+  (begin
+    (with-output-to-file "testfile-clo-4a.ss"
+      (lambda ()
+        (pretty-print
+         '(library (testfile-clo-4a)
+            (export f g)
+            (import (chezscheme))
+            (define (f a . rest)
+              (apply list a rest))
+            (define g
+              (case-lambda
+                [(a) "foo"]
+                [(a . rest) (apply list a rest)])))))
+      'replace)
+    #t)
+  (begin
+    (load-library "testfile-clo-4a.ss"
+                  (lambda (x) (parameterize ([optimize-level 2] [enable-cp0 #t] [#%$suppress-primitive-inlining #f] [current-eval compile])
+                                (eval x))))
+    #t)
+  (or
+   (and (compile-profile) #t) ; => testfile-clo-4a was compiled with profiling, so not quite the same as below
+   (equivalent-expansion?
+    (parameterize ([optimize-level 2] [enable-cp0 #t] [#%$suppress-primitive-inlining #f])
+      (expand/optimize
+       '(lambda (x y z)
+          (import (testfile-clo-4a))
+          (list
+           (f x y z)
+           (g x y z)))))
+    '(begin
+       (#3%$invoke-library '(testfile-clo-4a) '() 'testfile-clo-4a)
+       (lambda (x y z)
+         (#2%list (#2%list x y z)
+                  ((#3%$top-level-value 'g) x y z))))))
 )
 
 (mat lots-of-libraries
@@ -9886,8 +9947,8 @@
       (lambda (who path dir* all-ext*)
         (let-values ([(src-path obj-path obj-exists?)
                       (default-library-search-handler who path dir* all-ext*)])
-          (assert (equal? src-path "src2/lib.ss"))
-          (assert (equal? obj-path "obj/lib.so"))
+          (assert (equal? src-path (path-build "src2" "lib.ss")))
+          (assert (equal? obj-path (path-build "obj" "lib.so")))
           (assert obj-exists?)
           (values src-path obj-path obj-exists?))))
     '(printf "~a\n" (let () (import (lib)) a))))
@@ -9944,8 +10005,8 @@
         (let-values ([(src-path obj-path obj-exists?)
                       (default-library-search-handler who path dir* all-ext*)])
           ;; user reordered library-directories since compiling the wpo file
-          (assert (equal? src-path "src1/lib.ss"))
-          (assert (equal? obj-path "obj/lib.wpo"))
+          (assert (equal? src-path (path-build "src1" "lib.ss")))
+          (assert (equal? obj-path (path-build "obj" "lib.wpo")))
           (assert obj-exists?))
         ;; ... we install a new handler that returns the object file instead
         (library-search-handler
@@ -10011,13 +10072,13 @@
   (file-exists? "testdir/cil1.so")
   (file-exists? "testdir/cil2.so")
   (equal? $cil '(cil1 cil2))
-  (equal? (let () (import (testdir cil2)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil2)) (get-y)) '((57388321) . 57388321))
   (equal? (let () (import (testdir cil2)) (f 772) (get-y)) 772)
   (eq?
     (parameterize ([compile-imported-libraries #t])
       (load-program "testdir/cil"))
     (void))
-  (equal? (let () (import (testdir cil2)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil2)) (get-y)) '((57388321) . 57388321))
   (equal? $cil '(cil1 cil2))
   (begin
     (rm-rf "testdir")
@@ -10060,13 +10121,13 @@
   (file-exists? "testdir/cil3.so")
   (file-exists? "testdir/cil4.so")
   (equal? $cil '(cil3 cil4))
-  (equal? (let () (import (testdir cil4)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil4)) (get-y)) '((57388321) . 57388321))
   (equal? (let () (import (testdir cil4)) (f 772) (get-y)) 772)
   (eq?
     (parameterize ([compile-imported-libraries #t])
       (load-program "testdir/cil"))
     (void))
-  (equal? (let () (import (testdir cil4)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil4)) (get-y)) '((57388321) . 57388321))
   (equal? $cil '(cil3 cil4))
   (begin
     (rm-rf "testdir")
@@ -10112,7 +10173,7 @@
   (file-exists? "objdir/testdir/cil5.foo")
   (file-exists? "objdir/testdir/cil6.bar")
   (equal? $cil '(cil5 cil6))
-  (equal? (let () (import (testdir cil6)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil6)) (get-y)) '((57388321) . 57388321))
   (equal? (let () (import (testdir cil6)) (f 772) (get-y)) 772)
   (eq?
     (parameterize ([compile-imported-libraries #t]
@@ -10120,7 +10181,7 @@
                    [library-extensions '((".sls" . ".bar") (".ss" . ".foo"))])
       (load-program "testdir/cil"))
     (void))
-  (equal? (let () (import (testdir cil6)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil6)) (get-y)) '((57388321) . 57388321))
   (equal? $cil '(cil5 cil6))
   (begin
     (rm-rf "testdir")
@@ -10167,7 +10228,7 @@
       (load-program "testdir/cil"))
     (void))
   (equal? $cil '(cil8 cil7))
-  (equal? (let () (import (testdir cil8)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil8)) (get-y)) '((57388321) . 57388321))
   (begin
     (rm-rf "testdir")
     #t)
@@ -10213,7 +10274,7 @@
       (load-program "testdir/cil"))
     (void))
   (equal? $cil '(cil10 cil9))
-  (equal? (let () (import (testdir cil10)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil10)) (get-y)) '((57388321) . 57388321))
   (begin
     (rm-rf "testdir")
     #t)
@@ -10265,7 +10326,7 @@
     (parameterize ([compile-imported-libraries #t])
       (load-program "testdir/cil.so"))
     (void))
-  (equal? (let () (import (testdir cil12)) (get-y)) '((57388321) . 57388321)) 
+  (equal? (let () (import (testdir cil12)) (get-y)) '((57388321) . 57388321))
   (equal? $cil '())
   (begin
     (rm-rf "testdir")
@@ -10462,7 +10523,9 @@
     (separate-eval
       '(compile-imported-libraries #t)
       '(load-program "testdir/cil19C.ss"))
-    "compiling testdir/cil19B.ss with output to testdir/cil19B.so\ncompiling testdir/cil19A.ss with output to testdir/cil19A.so\n18\n")
+    (format
+     "compiling testdir~acil19B.ss with output to testdir~acil19B.so\ncompiling testdir~acil19A.ss with output to testdir~acil19A.so\n18\n"
+     (directory-separator) (directory-separator) (directory-separator) (directory-separator)))
   (file-exists? "testdir/cil19A.so")
   (file-exists? "testdir/cil19B.so")
   (equal?
@@ -10491,7 +10554,9 @@
     (separate-eval
       '(compile-imported-libraries #t)
       '(load-program "testdir/cil19C.ss"))
-    "compiling testdir/cil19A.ss with output to testdir/cil19A.so\ncompiling testdir/cil19B.ss with output to testdir/cil19B.so\n24\n")
+    (format
+     "compiling testdir~acil19A.ss with output to testdir~acil19A.so\ncompiling testdir~acil19B.ss with output to testdir~acil19B.so\n24\n"
+     (directory-separator) (directory-separator) (directory-separator) (directory-separator)))
   (equal?
     (separate-eval
       '(compile-imported-libraries #t)
@@ -10524,7 +10589,9 @@
     (separate-eval
       '(compile-imported-libraries #t)
       '(load-program "testdir/cil19C.ss"))
-    "compiling testdir/cil19A.ss with output to testdir/cil19A.so\ncompiling testdir/cil19B.ss with output to testdir/cil19B.so\n28\n")
+    (format
+     "compiling testdir~acil19A.ss with output to testdir~acil19A.so\ncompiling testdir~acil19B.ss with output to testdir~acil19B.so\n28\n"
+    (directory-separator) (directory-separator) (directory-separator) (directory-separator)))
   (equal?
     (separate-eval
       '(compile-imported-libraries #t)
@@ -10543,7 +10610,9 @@
     (separate-eval
       '(compile-imported-libraries #t)
       '(load-program "testdir/cil19C.ss"))
-    "compiling testdir/cil19A.ss with output to testdir/cil19A.so\ncompiling testdir/cil19B.ss with output to testdir/cil19B.so\n36\n")
+    (format
+     "compiling testdir~acil19A.ss with output to testdir~acil19A.so\ncompiling testdir~acil19B.ss with output to testdir~acil19B.so\n36\n"
+     (directory-separator) (directory-separator) (directory-separator) (directory-separator)))
   (equal?
     (separate-eval
       '(compile-imported-libraries #t)
@@ -10793,7 +10862,7 @@
     (begin
       (with-output-to-file "testfile-tlp3.ss"
         (lambda ()
-          (pretty-print 
+          (pretty-print
             '(library (testfile-tlp3)
                (export t1-x)
                (import (chezscheme))
@@ -10830,7 +10899,7 @@
       (define dep8)
       (with-output-to-file "testfile-tlp6.ss"
         (lambda ()
-          (pretty-print 
+          (pretty-print
             '(library (testfile-tlp6)
                (export t1-x)
                (import (chezscheme))
@@ -10865,7 +10934,7 @@
       (define dep8)
       (with-output-to-file "testfile-tlp9.ss"
         (lambda ()
-          (pretty-print 
+          (pretty-print
             '(library (testfile-tlp9)
                (export t1-x)
                (import (chezscheme))
@@ -10895,7 +10964,7 @@
             (load-program "testfile-tlp11.so")))
         dep8))
     '("332211\n" ((testfile-tlp9))))
-  (equal? (library-object-filename '(testfile-tlp9)) "testfile-tlp9.so")
+  (path-equal? (library-object-filename '(testfile-tlp9)) "testfile-tlp9.so")
  ; make sure internal module bindings are properly set up before
  ; the body forms are processed
   (begin
@@ -11193,17 +11262,17 @@
       'replace)
     (separate-compile 'li5)
     #t)
-  (equal?
+  (path-equal?
     (parameterize ([compile-imported-libraries #t])
       (eval '(let () (import (testfile-li3)) x))
       (library-object-filename '(testfile-li3)))
-    "testfile-li3.so")
+     "testfile-li3.so")
   (equal?
     (parameterize ([compile-imported-libraries #f])
       (eval '(let () (import (testfile-li4)) x))
       (library-object-filename '(testfile-li4)))
     #f)
-  (equal?
+  (path-equal?
     (begin
       (eval '(let () (import (testfile-li5)) x))
       (library-object-filename '(testfile-li5)))
@@ -11218,6 +11287,56 @@
       (load-library "testfile-li3.so")
       (library-object-filename '(testfile-li3)))
     "testfile-li3.so")
+  (begin
+    (define (test-library-info do-load file)
+      (separate-eval
+       `(,do-load ,file)
+       ;; no import here
+       '(begin
+          (define (show f)
+            (printf "~s: " f)
+            (guard (e [else (display-condition e) (newline)])
+              (printf "~s\n" ((eval f) '(testfile-li3)))))
+          (show 'library-object-filename)
+          (show 'library-requirements)
+          (show 'library-version)
+          (show 'library-exports))
+       ;; now import
+       '(import (testfile-li3))
+       '(show 'library-exports)))
+    #t)
+  (equal?
+   (test-library-info 'load-library "testfile-li3.ss")
+   (string-append
+    "library-object-filename: #f\n"
+    "library-requirements: ((rnrs (6)))\n"
+    "library-version: ()\n"
+    "library-exports: (x)\n"
+    "library-exports: (x)\n"))
+  (equal?
+   (test-library-info 'load-library "testfile-li3.so")
+   (string-append
+    "library-object-filename: \"testfile-li3.so\"\n"
+    "library-requirements: ((rnrs (6)))\n"
+    "library-version: ()\n"
+    "library-exports: (x)\n"
+    "library-exports: (x)\n"))
+  (equal?
+   (test-library-info 'visit "testfile-li3.so")
+   (string-append
+    "library-object-filename: \"testfile-li3.so\"\n"
+    "library-requirements: Exception: run-time information for library (testfile-li3) has not been loaded\n"
+    "library-version: ()\n"
+    "library-exports: (x)\n"
+    "library-exports: (x)\n"))
+  (equal?
+   (test-library-info 'revisit "testfile-li3.so")
+   (string-append
+    "library-object-filename: \"testfile-li3.so\"\n"
+    "library-requirements: Exception: compile-time information for library (testfile-li3) has not been loaded\n"
+    "library-version: ()\n"
+    "library-exports: Exception: compile-time information for library (testfile-li3) has not been loaded\n"
+    "library-exports: (x)\n"))
 )
 
 (mat rnrs-eval
@@ -11362,8 +11481,8 @@
  )
 
 (mat annotations
-  (error? ; #f is not a string
-    (make-source-file-descriptor #f
+  (source-file-descriptor?
+    (make-source-file-descriptor #f ; anything is allowed as a path
       (open-bytevector-input-port (string->utf8 "hello"))))
   (error? ; 17 is not a binary-input port
     (make-source-file-descriptor "foo" 17))
@@ -11590,7 +11709,7 @@
   (eq? (source-object-sfd source) sfd)
   (eqv? (source-object-bfp source) 0)
   (eqv? (source-object-efp source) (string-length str))
-  (error? ; not a string
+  (source-file-descriptor?
     (source-file-descriptor 'spam 0))
   (error? ; not an exact nonnegative integer
     (source-file-descriptor "spam" -1))
@@ -11611,6 +11730,7 @@
   (error? ; not an exact nonnegative integer
     (locate-source sfd 'a))
   (let-values ([() (locate-source sfd 7)]) #t)
+  (let-values ([() (locate-source (source-file-descriptor 'something-else 0) 7)]) #t)
   (begin
     (with-output-to-file "testfile.ss"
       (lambda ()
@@ -11628,7 +11748,7 @@
                    (call-with-values (lambda () (locate-source (source-object-sfd source) (source-object-bfp source))) vector)
                    (call-with-values (lambda () (locate-source (source-object-sfd source) (source-object-efp source))) vector)))])
       (load "testfile.ss"))
-    '(#("testfile.ss" 2 12) . #("testfile.ss" 2 13)))
+    (cons (vector (find-source "testfile.ss") 2 12) (vector (find-source "testfile.ss") 2 13)))
   (equal?
     (let ([sfd (source-file-descriptor (source-file-descriptor-path sfd) (source-file-descriptor-checksum sfd) )])
       (let ([source (make-source-object sfd 2 3)])
@@ -11640,7 +11760,7 @@
                        (call-with-values (lambda () (locate-source (source-object-sfd source) (source-object-bfp source))) vector)
                        (call-with-values (lambda () (locate-source (source-object-sfd source) (source-object-efp source))) vector)))])
           (load "testfile.ss"))))
-    '(#("testfile.ss" 2 12) . #("testfile.ss" 2 13)))
+    (cons (vector (find-source "testfile.ss") 2 12) (vector (find-source "testfile.ss") 2 13)))
 
   (error? ; not a source object
    (locate-source-object-source "spam" #t #t))
@@ -11717,7 +11837,7 @@
                                      (make-string (* 2 (file-buffer-size)) #\a)
                                      "\""
                                      "\nend"))
-    
+
     (define input-port-with-lines (open-string-input-port input-string-with-lines))
     (define sfd-with-lines
       (let ((op (open-output-file "testfile.ss" 'replace)))
@@ -11761,11 +11881,17 @@
        'truncate)
      (collect)
      (parameterize ([collect-request-handler void])
-       (let ([start (current-time)])
-         (load "testfile.ss" expand)
-         (let ([delta (time-difference (current-time) start)])
-           (+ (* #e1e9 (time-second delta))
-              (time-nanosecond delta))))))
+       (let ([start (current-time 'time-process)])
+         (let loop ([iters 1])
+           (load "testfile.ss" expand)
+           (let ([delta (time-difference (current-time 'time-process) start)])
+             (let ([n (/ (+ (* #e1e9 (time-second delta))
+                            (time-nanosecond delta))
+                         iters)])
+               (if (zero? n)
+                   ;; more iterations to get a non-0 time
+                   (loop (add1 iters))
+                   n)))))))
 
    (let loop ([tries 3])
      (when (zero? tries)
@@ -11899,5 +12025,27 @@
                  (with ([(z1 z2) 'y1])
                     '(z2 z1)))])
           #t)
-   (equal? (foo (a b) (c d) (e f)) '(b a))
- )
+   (equal? (foo (a b) (c d) (e f)) '(b a)))
+
+(mat quote-syntax
+   (equal? (syntax->datum (quote-syntax (a b c))) '(a b c))
+   (equal? (syntax->datum (quote-syntax ...)) '...)
+   (identifier? (quote-syntax if))
+   (let* ([sfd (make-source-file-descriptor "src" (open-bytevector-input-port '#vu8()))]
+          [src (make-source-object sfd 1 2)])
+     (identifier? (eval
+                   (make-annotation `(quote-syntax ,(make-annotation 'if src 'if))
+                                    src
+                                    '(quote-syntax if)))))
+   (bound-identifier=? (quote-syntax ...) (syntax (... ...)))
+   (free-identifier=? (quote-syntax ...) (syntax (... ...)))
+   (equal? (with-syntax ([x #'y]) (syntax->datum (quote-syntax x))) 'x)
+   (let-syntax ([m (lambda (stx)
+                     (syntax-case stx ()
+                       [(_ x) #'(and (equal? (syntax->datum (quote-syntax x)) '+)
+                                     (free-identifier=? (syntax x) #'-))]))])
+     (with-syntax ([+ #'-]) (m +)))
+   (error? ; invalid syntax
+     (quote-syntax))
+   (error? ; invalid syntax
+     (quote-syntax a b)))

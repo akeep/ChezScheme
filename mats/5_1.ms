@@ -36,6 +36,7 @@
     (not (eqv? "hi there" (string-append "hi " "there")))
     (not (eqv? (vector 1 2 (vector 3 4) 5) '#(1 2 #(3 4) 5)))
     (eqv? +nan.0 +nan.0)
+    (eqv? +nan.0 (abs +nan.0))
     (eqv? +inf.0 +inf.0)
     (eqv? -inf.0 -inf.0)
     (not (eqv? -inf.0 +inf.0))
@@ -64,6 +65,7 @@
     (equal? (vector 1 2 (vector 3 4) 5) '#(1 2 #(3 4) 5))
     (not (equal? (vector 1 2 (vector 3 4) 5) '#(1 2 3 4 5)))
     (equal? +nan.0 +nan.0)
+    (equal? +nan.0 (abs +nan.0))
     (equal? +inf.0 +inf.0)
     (equal? -inf.0 -inf.0)
     (not (equal? -inf.0 +inf.0))
@@ -490,6 +492,34 @@
     (time (equal? (make-x 100) y)))
 
  ; tests that stress corrected SRFI 85 implementation
+ (begin
+   (define $ok-comparison-duration?
+     (let ()
+       (define (duration->inexact t) (+ (* (time-second t) 1e9)
+                                        (inexact (time-nanosecond t))))
+       (let* ([baseline
+               ;; measure a loop to use as a scale
+               (let* ([t0 (current-time 'time-process)]
+                      [l1 (list (current-time) (current-time))]
+                      [l2 (list (car l1) (cadr l1))]
+                      [init-i 1000])
+                 (let f ([i init-i] [iters 1] [x #t])
+                   (if (fx= i 0)
+                       (and x
+                            (let ([n (/ (duration->inexact (time-difference (current-time 'time-process) t0))
+                                        iters)])
+                              (if (zero? n)
+                                  ;; more iterations to get a non-0 CPU time
+                                  (f init-i (add1 iters) #t)
+                                  n)))
+                       (f (fx- i 1) iters (and x (equal? l1 l2))))))]
+              ;; scale to a machine where hardwired `nsec`s make sense:
+              [scale (/ baseline 20000.0)])
+         (lambda (t0 t nsec)
+           (< (duration->inexact (time-difference t t0))
+              (* nsec scale))))))
+   #t)
+
  (or (equal?
        (let ([v1 '#200=(#200#)] [v2 '#201=(#201#)])
          (let ([t0 (current-time 'time-process)])
@@ -500,9 +530,7 @@
              (list
                ans
                (let ([t (current-time 'time-process)])
-                 (< (+ (* (- (time-second t) (time-second t0)) 1000000000)
-                       (- (time-nanosecond t) (time-nanosecond t0)))
-                    30000000))))))
+                 ($ok-comparison-duration? t0 t 30000000))))))
        '(#t #t))
       (#%$enable-check-heap))
 
@@ -514,10 +542,8 @@
               (list
                 ans
                 (let ([t (current-time 'time-process)])
-                  (> (+ (* (- (time-second t) (time-second t0)) 1000000000)
-                        (- (time-nanosecond t) (time-nanosecond t0)))
-                     100000000))))))
-        '(#t #f))
+                  ($ok-comparison-duration? t0 t 100000000))))))
+        '(#t #t))
       (#%$enable-check-heap))
 
   (or (equal?
@@ -532,9 +558,7 @@
                   (let ([t (current-time 'time-process)])
                     (list
                       ans
-                      (< (+ (* (- (time-second t) (time-second t0)) 1000000000)
-                            (- (time-nanosecond t) (time-nanosecond t0)))
-                         200000000))))))))
+                     ($ok-comparison-duration? t0 t 200000000))))))))
         '(#t #t))
       (#%$enable-check-heap))
 )
@@ -818,9 +842,21 @@
     (fxvector? (fxvector 1 2 3 4))
     (not (fxvector? '(1 2 3)))
     (not (fxvector? '#(1 2 3)))
+    (not (fxvector? '#vfl(1.0 2.0 3.0)))
     (not (fxvector? '#vu8(1 2 3)))
     (not (fxvector? "hi there"))
     (not (fxvector? 234234))
+ )
+
+(mat flvector?
+    (flvector? #vfl(1.0 2.0 3.0))
+    (flvector? (flvector 1.0 2.0 3.0 4.0))
+    (not (flvector? '(1 2 3)))
+    (not (flvector? '#(1.0 2.0 3.0)))
+    (not (flvector? '#vfx(1 2 3)))
+    (not (flvector? '#vu8(1 2 3)))
+    (not (flvector? "hi there"))
+    (not (flvector? 234234))
  )
 
 (mat bytevector?

@@ -17,18 +17,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifndef WIN32
+#ifndef _WIN32
 #include <string.h>
 #endif
 
 #ifdef _WIN32
 #  define SCHEME_IMPORT
+#  include <windows.h>
 #  include "scheme.h"
 #  undef EXPORT
 #  define EXPORT extern __declspec (dllexport)
 #else
 #include "scheme.h"
 #endif
+
+/* Standard in C99, but widely available in environments for earlier C dialects: */
+#include <stdbool.h>
 
 EXPORT int chk_data(void) {
     static char c[10]="ABCDEFGH";
@@ -177,7 +181,11 @@ EXPORT char Srvtest_char(ptr code, ptr x1) {
     return (*((char (*)(ptr))Sforeign_callable_entry_point(code)))(x1);
 }
 
-#ifdef WIN32
+EXPORT bool Srvtest_stdbool(ptr code, ptr x1) {
+    return (*((bool (*)(ptr))Sforeign_callable_entry_point(code)))(x1);
+}
+
+#ifdef _WIN32
 EXPORT int __stdcall sum_stdcall(int a, int b) {
     return a + b;
 }
@@ -207,7 +215,7 @@ EXPORT com_instance_t *get_com_instance(void) {
   com_instance.data = -31;
   return &com_instance;
 }
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
 /* foreign_callable example adapted from foreign.stex */
 typedef void (*CB)(char);

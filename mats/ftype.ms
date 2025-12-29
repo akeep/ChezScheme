@@ -59,12 +59,14 @@
   (begin
     (define max-integer-alignment
       (if (or (> (fixnum-width) 32)
-              (memq (machine-type) '(i3nt ti3nt i3qnx ti3qnx arm32le tarm32le ppc32le tppc32le)))
+              (memq (machine-type) '(i3nt ti3nt i3qnx ti3qnx arm32le tarm32le ppc32le tppc32le
+                                          pb32l tpb32l pb32b tpb32b)))
           8
           4))
     (define max-float-alignment
       (if (or (> (fixnum-width) 32)
-              (memq (machine-type) '(i3nt ti3nt arm32le tarm32le ppc32le tppc32le)))
+              (memq (machine-type) '(i3nt ti3nt arm32le tarm32le ppc32le tppc32le
+                                          pb32l tpb32l pb32b tpb32b)))
           8
           4))
     (define-syntax fptr-free
@@ -81,6 +83,7 @@
            ans)]))
     #t)
 )
+
 
 (mat ftype
    (error? ; misplaced function type
@@ -441,6 +444,7 @@
         (uptr . ,(if (< (fixnum-width) 32) "uint32_t" "uint64_t"))
         (fixnum . ,(if (< (fixnum-width) 32) "int32_t" "int64_t"))
         (boolean . "int")
+        (stdbool . "int8_t")
         (integer-8 . "int8_t")
         (unsigned-8 . "uint8_t")
         (integer-16 . "int16_t")
@@ -450,7 +454,9 @@
         (integer-64 . "int64_t")
         (unsigned-64 . "uint64_t")
         (single-float . "float")
-        (double-float . "double")))
+        (double-float . "double")
+        (ftype-pointer . "void*")
+        (ftype-scheme-object-pointer . "void*")))
 
     (define ftype-paths
       (lambda (name ftype alist)
@@ -511,7 +517,7 @@
     (define C-test-code
       (lambda (ftype-defn* path* ndefs npaths i* j*)
         (let ([ndefs (length ftype-defn*)])
-          (printf "#include \"~a/ftype.h\"\n\
+          (printf "#include \"~a\"\n\
                    #define offset(x, y) (int)((char *)&y - (char *)&x)\n\
                    EXPORT int *foo() {\n\
                      ~{~a\n~}\
@@ -520,7 +526,7 @@
                      ~{~a\n~}\
                      return a;\
                    }\n"
-            *mats-dir*
+            (find-source "ftype.h")
             (map
               (lambda (ftype-defn)
                 (format "typedef ~a typedef_~a ~a;"
@@ -552,23 +558,15 @@
               [testfile.so (format "testfile-~a.~:[so~;dll~]" testfile
                              (windows?))])
           (with-output-to-file testfile.c thunk 'replace)
-          (unless (= (case (machine-type)
-                       [(i3osx ti3osx)
-                        (system (format "cc -m32 -dynamiclib -o ~a ~a" testfile.so testfile.c))]
-                       [(a6osx a6osx)
-                        (system (format "cc -m64 -dynamiclib -o ~a ~a" testfile.so testfile.c))]
-                       [(a6nt ta6nt)
-                        (system (format "set cl= && ~a\\..\\c\\vs.bat amd64 && cl /DWIN32 /Fe~a /LD /MD /nologo ~a"
-                                  (patch-exec-path *mats-dir*) testfile.so testfile.c))]
-                       [(i3nt ti3nt)
-                        (system (format "set cl= && ~a\\..\\c\\vs.bat x86 && cl /DWIN32 /Fe~a /LD /MD /nologo ~a"
-                                  (patch-exec-path *mats-dir*) testfile.so testfile.c))]
-                       [(arm32le tarm32le)
-                        (system (format "cc -fPIC -shared -o ~a ~a" testfile.so testfile.c))]
-                       [else ; this should work for most intel-based systems that use gcc...
-                        (if (> (fixnum-width) 32)
-                            (system (format "cc -m64 -fPIC -shared -o ~a ~a" testfile.so testfile.c))
-                            (system (format "cc -m32 -fPIC -shared -o ~a ~a" testfile.so testfile.c)))])
+          (unless (= (system (format "~a ~a  ~a ~a  ~a ~a"
+                                     (getenv "FTYPE_CC")
+                                     (or (getenv "FTYPE_CFLAGS") "")
+                                     (if (equal? (getenv "FTYPE_TOOLCHAIN") "windows")
+                                         "/Fe:"
+                                         "-o")
+                                     testfile.so
+                                     testfile.c
+                                     (or (getenv "FTYPE_LDFLAGS") "")))
                      0)
             (errorf 'ftype-test "C compilation failed"))
           (load-shared-object (format "./~a" testfile.so)))))
@@ -704,7 +702,10 @@
     [M2 (struct [a M1] [b integer-32])]
     [M3 (struct [a integer-32] [b M1])]
     [N1 (struct [a integer-32] [b integer-64])]
-  )
+    [P1 (struct [a ftype-pointer])]
+    [P2 (struct [a (* ftype-pointer)])]
+    [P3 (struct [a ftype-scheme-object-pointer])]
+    [P4 (struct [a (* ftype-scheme-object-pointer)])])
 
  ; ----------------
 
@@ -729,7 +730,8 @@
            [a15 fixnum]
            [a16 iptr]
            [a17 uptr]
-           [a18 void*]))
+           [a18 void*]
+           [a19 stdbool]))
        (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
        (free-after a
          (ftype-set! A (a1) a 3.5)
@@ -750,6 +752,7 @@
          (ftype-set! A (a16) a -30004)
          (ftype-set! A (a17) a #xabcdef07)
          (ftype-set! A (a18) a 25000)
+         (ftype-set! A (a19) a 'howdy)
          (list
            (ftype-ref A (a1) a)
            (ftype-ref A (a2) a)
@@ -768,7 +771,8 @@
            (ftype-ref A (a15) a)
            (ftype-ref A (a16) a)
            (ftype-ref A (a17) a)
-           (ftype-ref A (a18) a))))
+           (ftype-ref A (a18) a)
+           (ftype-ref A (a19) a))))
     `(3.5
       -4.5
       -30000
@@ -786,7 +790,8 @@
       ,(most-positive-fixnum)
       -30004
       #xabcdef07
-      25000))
+      25000
+      #t))
 
   (begin
     (define-ftype A
@@ -1029,7 +1034,11 @@
 
  ; ----------------
   (begin
-    (define-ftype A (bits [x unsigned 3] [y unsigned 5]))
+    (meta-cond
+     [(pb?)
+      (define-ftype A (endian little (bits [x unsigned 3] [y unsigned 5])))]
+     [else
+      (define-ftype A (bits [x unsigned 3] [y unsigned 5]))])
     (define-ftype B (* A))
     (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
     (define b (make-ftype-pointer B (foreign-alloc (ftype-sizeof B))))
@@ -1060,6 +1069,85 @@
     (fptr-free a)
     (fptr-free b)
     #t)
+
+ ; ----------------
+  (begin
+    (define-ftype A (struct [x (* integer-8)] [y ftype-pointer]))
+    (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
+    (ftype-set! A (x) a (make-ftype-pointer integer-8 (foreign-alloc (ftype-sizeof integer-8))))
+    (ftype-set! A (y) a (make-ftype-pointer integer-8 0))
+    (ftype-set! A (x *) a 10)
+    (define bv (bytevector 1 2 3 4 5))
+    (define bv-p (make-ftype-scheme-object-pointer bv 2))
+    #t)
+
+  (error? ; wrong pointer type
+   (ftype-ref integer-8 () bv-p))
+  (error? ; wrong pointer type
+   (ftype-set! integer-8 () bv-p 0))
+  (error? ; wrong pointer type
+   (ftype-ref integer-8 () (ftype-any-ref ftype-pointer () a)))
+
+  (equal? (ftype-ref A (x *) a) 10)
+  (error? ; cannot deference void
+   (ftype-ref A (y *) a))
+  (error? ; wrong pointer type
+   (ftype-set! A (x *) bv-p))
+  (ftype-pointer-null? (ftype-ref A (y) a))
+
+  (equal? (ftype-any-ref integer-8 () (ftype-any-ref ftype-pointer () a)) 10)
+
+  (eq? bv (ftype-scheme-object-pointer-object bv-p))
+  (eqv? 2 (ftype-scheme-object-pointer-offset bv-p))
+  (eqv? 3 (ftype-any-ref integer-8 () bv-p 0))
+  (eqv? 4 (ftype-any-ref integer-8 () bv-p 1))
+  (eqv? 2 (ftype-any-ref integer-8 () (make-ftype-scheme-object-pointer bv -11) 12))
+  (begin
+    (ftype-any-set! integer-8 () bv-p 1 5)
+    (eqv? 5 (bytevector-u8-ref bv 3)))
+
+  (begin
+    (collect 0)
+    (eq? bv (ftype-scheme-object-pointer-object bv-p)))
+
+  (begin
+    (foreign-free (ftype-pointer-address (ftype-ref A (x) a)))
+    (lock-object bv)
+    (ftype-set! A (x) a (make-ftype-pointer integer-8 (ftype-pointer-address bv-p)))
+    (ftype-set! A (y) a bv-p)
+    #t)
+
+  (equal? (ftype-ref A (x *) a) 3)
+  (begin
+    (unlock-object bv)
+    #t)
+  (equal? (ftype-pointer->sexpr bv-p) `(offset ,bv 2))
+  (equal? (ftype-pointer->sexpr (make-ftype-scheme-object-pointer bv)) bv)
+  (equal? (ftype-pointer->sexpr (make-ftype-scheme-object-pointer bv 0)) bv)
+
+  (begin
+    (ftype-any-set! uptr () (ftype-&ref A (y) a) 0)
+    (ftype-pointer-null? (ftype-ref A (y) a)))
+
+  ;; null read as an object pointer produces a null fptr
+  (ftype-pointer-null? (ftype-any-ref ftype-scheme-object-pointer ()
+                                      (make-ftype-scheme-object-pointer
+                                       (bytevector 0 0 0 0 0 0 0 0)
+                                       0)))
+
+  ;; ftype-any-ref offsets are not scaled by the type
+  (equal? #x0202 (ftype-any-ref unsigned-16 () (make-ftype-scheme-object-pointer (bytevector 1 1 2 2 3 3 4 4))
+                                2))
+  (let ([bv (bytevector 1 1 2 2 3 3 4 4)])
+    (ftype-any-set! unsigned-16 () (make-ftype-scheme-object-pointer bv) 2 #x0505)
+    (equal? bv #vu8(1 1 5 5 3 3 4 4)))
+
+  (let ([bv (make-reference-bytevector 8)])
+    (ftype-any-set! ftype-scheme-object-pointer () (make-ftype-scheme-object-pointer bv) 0 (make-ftype-scheme-object-pointer 'hello))
+    (collect)
+    (eq? (ftype-scheme-object-pointer-object
+          (ftype-any-ref ftype-scheme-object-pointer () (make-ftype-scheme-object-pointer bv) 0))
+         'hello))
 
  ; ----------------
   (begin
@@ -1309,6 +1397,19 @@
    (define-syntax unsigned-16 (make-compile-time-value "Non-interfering binding"))
    (let ([fptr (make-ftype-pointer unsigned-16 0)])
      (= (ftype-pointer-address fptr) 0)))
+
+  ;; regression test for arm32 backend and distant offset to floating-point field
+  (let ()
+    (define-ftype T
+      (struct
+          [a (array 6368 int)] ; offset derived from 6368 is not funky12
+          [n double]))
+    (define (f x y)
+      (ftype-set! T (n) x y))
+    (let ([p (make-ftype-pointer T (foreign-alloc (ftype-sizeof T)))])
+      (f p 1.0)
+      (equal? (ftype-ref T (n) p) 1.0)))
+
 )
 
 (mat ftype-pointer-address-optimizations
@@ -1485,6 +1586,7 @@
     (define $not-much-alloc?
       (lambda (require-cp0? p)
         (or (eq? (current-eval) interpret)
+            (pb?)
             (#%$suppress-primitive-inlining)
             (eq? (compile-profile) 'source)
             (not (= (optimize-level) 3))
@@ -1497,6 +1599,15 @@
                            (f (fx- n 1)))))
                    (let ([s1 (statistics)])
                      (<= (- (sstats-bytes s1) (sstats-bytes s0)) 1000)))))))
+    (define-syntax pick-endianness-if-necessary
+      (lambda (stx)
+        (syntax-case stx ()
+          [(_ (define-ftype id t))
+           (cond
+             [(pb?)
+              #'(define-ftype id (endian little t))]
+             [else
+              #'(define-ftype id t)])])))
     #t)
 
   ; might should also check ftype-&ref, ftype-locked-decr!, ftype-init-lock,
@@ -1546,7 +1657,8 @@
 
   ($not-much-alloc? #t
     (let ()
-      (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])]))
+      (pick-endianness-if-necessary
+       (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])])))
       (define-ftype B (* A))
       (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
       (define b (make-ftype-pointer B (foreign-alloc (ftype-sizeof B))))
@@ -1572,7 +1684,8 @@
 
   ($not-much-alloc? #t
     (let ()
-      (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])]))
+      (pick-endianness-if-necessary
+       (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])])))
       (define-ftype B (* A))
       (define-ftype BB (struct [b1 char] [b2 B]))
       (define-ftype BBB (* BB))
@@ -1602,7 +1715,8 @@
 
   ($not-much-alloc? #t
     (let ()
-      (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])]))
+      (pick-endianness-if-necessary
+       (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])])))
       (define-ftype C (struct [c1 int] [c2 A]))
       (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
       (define c (make-ftype-pointer C (foreign-alloc (ftype-sizeof C))))
@@ -1615,7 +1729,8 @@
 
   ($not-much-alloc? #t
     (let ()
-      (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])]))
+      (pick-endianness-if-necessary
+       (define-ftype A (struct [x (array 10 int)] [y (bits [y1 unsigned 3] [y2 unsigned 12] [y3 signed 17])])))
       (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
       (define a-addr (ftype-pointer-address a))
       (lambda (n)
@@ -2435,18 +2550,22 @@
 
   (eqv? (ftype-ref Bl (a) bl) -3.14)
   (or (not (eq? (native-endianness) 'little))
+      (pb?)
       (eqv? (ftype-ref D () bl) -3.14))
   (eqv? (ftype-ref Dl () bl) -3.14)
   (or (not (eq? (native-endianness) 'little))
+      (pb?)
       (eqv? (ftype-ref double () bl) -3.14))
   (error? ; invalid syntax
     (ftype-ref (endian little double) () bl))
 
   (eqv? (ftype-ref Bb (a) bb) -3.14)
   (or (not (eq? (native-endianness) 'big))
+      (pb?)
       (eqv? (ftype-ref D () bb) -3.14))
   (eqv? (ftype-ref Db () bb) -3.14)
   (or (not (eq? (native-endianness) 'big))
+      (pb?)
       (eqv? (ftype-ref double () bb) -3.14))
   (error? ; invalid syntax
     (ftype-ref (endian big double) () bb))
@@ -2783,11 +2902,11 @@
     (ftype-init-lock! A (g *) x)
     #t)
 
-  (ftype-lock! A (c) x)
-  (ftype-lock! A (f f1) x)
-  (ftype-lock! A (f f2 1 f3b) x)
-  (ftype-lock! A (f f2 $idx f3b) x)
-  (ftype-lock! A (g *) x)
+  (retry-for-spurious (ftype-lock! A (c) x))
+  (retry-for-spurious (ftype-lock! A (f f1) x))
+  (retry-for-spurious (ftype-lock! A (f f2 1 f3b) x))
+  (retry-for-spurious (ftype-lock! A (f f2 $idx f3b) x))
+  (retry-for-spurious (ftype-lock! A (g *) x))
 
   (not (ftype-lock! A (c) x))
   (not (ftype-lock! A (f f1) x))
@@ -2817,6 +2936,17 @@
     (fptr-free x)
     (fptr-free g)
     #t)
+
+  ;; This is intended mainly as a test of `retry-for-spurious`:
+  (let ([m (make-ftype-pointer iptr (foreign-alloc (ftype-sizeof iptr)))])
+    (ftype-init-lock! iptr () m)
+    (let loop ([i 10000000])
+      (or (fx= i 0)
+          (and (retry-for-spurious (ftype-lock! iptr () m))
+               (begin
+                 (ftype-unlock! iptr () m)
+                 (loop (fx- i 1)))))))
+
 )
 
 (mat ftype-compile-file
@@ -3157,7 +3287,8 @@
  ; ----------------
 
   (begin
-    (define-ftype Ebits (bits [x signed 32]))
+    (pick-endianness-if-necessary
+     (define-ftype Ebits (bits [x signed 32])))
     (define ebits (make-ftype-pointer Ebits 0))
     #t)
 
@@ -3994,7 +4125,8 @@
              [a15 fixnum]
              [a16 iptr]
              [a17 uptr]
-             [a18 void*])))
+             [a18 void*]
+             [a19 stdbool])))
        (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
        (free-after a
          (ftype-set! A (a1) a 3.5)
@@ -4015,6 +4147,7 @@
          (ftype-set! A (a16) a -30004)
          (ftype-set! A (a17) a #xabcdef07)
          (ftype-set! A (a18) a 25000)
+         (ftype-set! A (a19) a 'howdy)
          (list
            (ftype-ref A (a1) a)
            (ftype-ref A (a2) a)
@@ -4033,7 +4166,8 @@
            (ftype-ref A (a15) a)
            (ftype-ref A (a16) a)
            (ftype-ref A (a17) a)
-           (ftype-ref A (a18) a))))
+           (ftype-ref A (a18) a)
+           (ftype-ref A (a19) a))))
     `(3.5
       -4.5
       -30000
@@ -4051,7 +4185,8 @@
       ,(most-positive-fixnum)
       -30004
       #xabcdef07
-      25000))
+      25000
+      #t))
   (equal?
     (let ()
        (define-ftype A
@@ -4074,7 +4209,8 @@
              [a15 fixnum]
              [a16 iptr]
              [a17 uptr]
-             [a18 void*])))
+             [a18 void*]
+             [a19 stdbool])))
        (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
        (free-after a
          (ftype-set! A (a1) a 3.5)
@@ -4095,6 +4231,7 @@
          (ftype-set! A (a16) a -30004)
          (ftype-set! A (a17) a #xabcdef07)
          (ftype-set! A (a18) a 25000)
+         (ftype-set! A (a19) a 'howdy)
          (list
            (ftype-ref A (a1) a)
            (ftype-ref A (a2) a)
@@ -4113,7 +4250,8 @@
            (ftype-ref A (a15) a)
            (ftype-ref A (a16) a)
            (ftype-ref A (a17) a)
-           (ftype-ref A (a18) a))))
+           (ftype-ref A (a18) a)
+           (ftype-ref A (a19) a))))
     `(3.5
       -4.5
       -30000
@@ -4131,7 +4269,8 @@
       ,(most-positive-fixnum)
       -30004
       #xabcdef07
-      25000))
+      25000
+      #t))
   (equal?
     (let ()
        (define-ftype A
@@ -4154,7 +4293,8 @@
              [a15 fixnum]
              [a16 iptr]
              [a17 uptr]
-             [a18 void*])))
+             [a18 void*]
+             [a19 stdbool])))
        (define a (make-ftype-pointer A (foreign-alloc (ftype-sizeof A))))
        (free-after a
          (ftype-set! A (a1) a 3.5)
@@ -4175,6 +4315,7 @@
          (ftype-set! A (a16) a -30004)
          (ftype-set! A (a17) a #xabcdef07)
          (ftype-set! A (a18) a 25000)
+         (ftype-set! A (a19) a 'howdy)
          (list
            (ftype-ref A (a1) a)
            (ftype-ref A (a2) a)
@@ -4193,7 +4334,8 @@
            (ftype-ref A (a15) a)
            (ftype-ref A (a16) a)
            (ftype-ref A (a17) a)
-           (ftype-ref A (a18) a))))
+           (ftype-ref A (a18) a)
+           (ftype-ref A (a19) a))))
     `(3.5
       -4.5
       -30000
@@ -4211,7 +4353,8 @@
       ,(most-positive-fixnum)
       -30004
       #xabcdef07
-      25000))
+      25000
+      #t))
 
  ; ----------------
   (begin
@@ -5537,6 +5680,8 @@
 
     #t)
 
+  ;; works on most machines, but we can't really guarantee anything about a fault:
+  #;
   (if (memq (machine-type) '(ti3ob ta6ob)) ; avoid openbsd/pthreads signal bugs
       (error #f "openbsd pthreads + signals is fubar")
       (equal?
@@ -5553,6 +5698,8 @@
            [i null]
            [j (* invalid)])))
 
+  ;; works on most machines, but we can't really guarantee anything about a fault:
+  #;
   (if (memq (machine-type) '(ti3ob ta6ob)) ; avoid openbsd/pthreads signal bugs
       (error #f "openbsd pthreads + signals is fubar")
       (equal?
@@ -5586,17 +5733,23 @@
 
   (equal?
     (ftype-pointer-ftype (make-ftype-pointer A 0))
-    (case (native-endianness)
-      [(big) '(endian little double)]
-      [(little) 'double]
-      [else (errorf #f "unexpected native endianness")]))
+    (case (machine-type)
+      [(pb tpb) '(endian little double)]
+      [else
+       (case (native-endianness)
+         [(big) '(endian swapped double)]
+         [(little) 'double]
+         [else (errorf #f "unexpected native endianness")])]))
 
   (equal?
     (ftype-pointer-ftype (make-ftype-pointer B 0))
-    (case (native-endianness)
-      [(big) 'double]
-      [(little) '(endian big double)]
-      [else (errorf #f "unexpected native endianness")]))
+    (case (machine-type)
+      [(pb tpb) '(endian big double)]
+      [else
+       (case (native-endianness)
+         [(big) 'double]
+         [(little) '(endian swapped double)]
+         [else (errorf #f "unexpected native endianness")])]))
 
   (begin
     (define-ftype A (endian little char))
@@ -5629,7 +5782,8 @@
           [a15 fixnum]
           [a16 iptr]
           [a17 uptr]
-          [a18 void*])))
+          [a18 void*]
+          [a19 stdbool])))
     #t)
   (equivalent-expansion?
     (parameterize ([optimize-level 3] [enable-cp0 #t] [#%$suppress-primitive-inlining #f])
@@ -5653,6 +5807,7 @@
            (ftype-ref A (a16) x)
            (ftype-ref A (a17) x)
            (ftype-ref A (a18) x)
+           (ftype-ref A (a19) x)
            x)))
     '(lambda (x) x))
   (equivalent-expansion?
@@ -5677,6 +5832,7 @@
            (ftype-&ref A (a16) x)
            (ftype-&ref A (a17) x)
            (ftype-&ref A (a18) x)
+           (ftype-&ref A (a19) x)
            x)))
     '(lambda (x) x))
   (begin
@@ -5700,7 +5856,8 @@
           [a15 fixnum]
           [a16 iptr]
           [a17 uptr]
-          [a18 void*])))
+          [a18 void*]
+          [a19 stdbool])))
     #t)
   (equivalent-expansion?
     (parameterize ([optimize-level 3] [enable-cp0 #t] [#%$suppress-primitive-inlining #f])
@@ -5724,6 +5881,7 @@
            (ftype-ref A (a16) x)
            (ftype-ref A (a17) x)
            (ftype-ref A (a18) x)
+           (ftype-ref A (a19) x)
            x)))
     '(lambda (x) x))
   (equivalent-expansion?
@@ -5748,6 +5906,7 @@
            (ftype-&ref A (a16) x)
            (ftype-&ref A (a17) x)
            (ftype-&ref A (a18) x)
+           (ftype-&ref A (a19) x)
            x)))
     '(lambda (x) x))
   (begin

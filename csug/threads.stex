@@ -89,13 +89,28 @@ synchronized across processors.
 \scheme{fork-thread} invokes \var{thunk} in a new thread and returns
 a thread object.
 
-Nothing can be done with the thread object returned by
-\scheme{fork-thread}, other than to print it.
-
 Threads created by foreign code using some means other than
 \scheme{fork-thread} must call \scheme{Sactivate_thread}
 (Section~\ref{SECTFOREIGNCLIB}) before touching any Scheme data
 or calling any Scheme procedures.
+
+%----------------------------------------------------------------------------
+\entryheader
+\formdef{thread-join}{\categoryprocedure}{(thread-join \var{thread})}
+\returns unspecified
+\listlibraries
+\endnoskipentryheader
+
+\noindent
+Waits until \var{thread} has completed.
+
+%----------------------------------------------------------------------------
+\entryheader
+\formdef{get-initial-thread}{\categoryprocedure}{(get-initial-thread)}
+\returns a thread object for the initial thread
+\listlibraries
+\endentryheader
+
 
 %----------------------------------------------------------------------------
 \entryheader
@@ -117,6 +132,19 @@ relationship to the process id returned by
 \index{\scheme{get-process-id}}\scheme{get-process-id}, which is the same
 in all threads.
 
+%----------------------------------------------------------------------------
+\entryheader
+\formdef{thread-preserve-ownership!}{\categoryprocedure}{(thread-preserve-ownership!)}
+\formdef{thread-preserve-ownership!}{\categoryprocedure}{(thread-preserve-ownership! \var{thread})}
+\returns unspecified
+\listlibraries
+\endnoskipentryheader
+
+\noindent
+Provides a hint to the storage manager that \var{thread} (which
+defaults to the current thread if not supplied) can particularly
+benefit from tracking the objects that it allocates for parallel
+collection.
 
 \section{Mutexes}
 
@@ -336,7 +364,10 @@ not just by the process or thread that most recently locked the lock.
 
 The lock mechanism provides little structure, and mistakes
 in allocation and use can lead to memory faults, deadlocks,
-and other problems.
+and other problems. Furthermore, no memory ordering is implied by a lock
+operation, which means that \scheme{memory-order-acquire} and
+\scheme{memory-order-release} may be needed to complete the intended
+synchronization of a lock.
 Thus, it is usually advisable to use locks only as part of a
 higher-level abstraction that ensures locks are used in a
 disciplined manner.
@@ -347,7 +378,7 @@ disciplined manner.
     (foreign-alloc (ftype-sizeof uptr))))
 
 (ftype-init-lock! uptr () lock)
-(ftype-lock! uptr () lock) ;=> #t
+(ftype-lock! uptr () lock) ;=> #t, assuming no spurious failure
 (ftype-lock! uptr () lock) ;=> #f
 (ftype-unlock! uptr () lock)
 (ftype-spin-lock! uptr () lock)
@@ -386,9 +417,13 @@ to the use of any of the other operators; if this is not done, the
 behavior of the other operators is undefined.
 
 \scheme{ftype-lock!} can be used to lock the lock.
-If it finds the lock unlocked at the time of the operation, it locks
+If it finds the lock unlocked at the time of the operation, it (normally) locks
 the lock and returns \scheme{#t}; if it finds the lock already locked,
-it returns \scheme{#f} without changing the lock.
+it returns \scheme{#f} without changing the lock. On an architecture with a weak memory model,
+\scheme{ftype-lock!} can spuriously fail, leaving a lock unchanged and returning
+\scheme{#f} even if the lock is currently unlocked. On success, no memory ordering is implied,
+which means that \scheme{memory-order-acquire} may be
+needed to complete an intended synchronization.
 
 \scheme{ftype-spin-lock!} can also be used to lock the lock.
 If it finds the lock unlocked at the time of the operation, it locks the
@@ -404,6 +439,9 @@ the lock.
 \scheme{ftype-unlock!} is used to unlock a lock.
 If it finds the lock locked, it unlocks the lock and returns.
 Otherwise, it returns without changing the lock.
+On an architecture with a weak memory model,
+no memory ordering is implied, and \scheme{memory-order-release} may be
+needed to complete an intended synchronization.
 
 \section{Locked increment and decrement\label{SECTTHREADLOCKEDINCRDECR}}
 
@@ -558,6 +596,36 @@ Objects guarded by an ftype guardian might contain pointers to other
 objects whose reference counts should also be incremented upon
 allocation of the containing object and decremented upon freeing
 of the containing object.
+
+
+
+\section{Memory Consistency\label{SECTSMGMTMEMMODEL}}
+
+Scheme threads can expose the memory-consistency model of the
+underlying processor, except to the degree that it would interfere
+with the memory safety of Scheme programs. For example, if two threads
+share a vector, then a \scheme{vector-set!} in one thread will not
+allow the other thread to read the vector and see a partially
+constructed primitive object installed into the vector; the Scheme
+system includes a memory fence around operations and on platforms as
+needed to preserve safety. There's no guarantee, for example, that
+assigning to multiple slots in an fxvector will become visible in the
+same order to other threads that share the vector, because no such
+ordering is required to preserve memory safety.
+
+%----------------------------------------------------------------------------
+\entryheader
+\formdef{memory-order-acquire}{\categoryprocedure}{(memory-order-acquire)}
+\formdef{memory-order-release}{\categoryprocedure}{(memory-order-release)}
+\returns unspecified
+\listlibraries
+\endnoskipentryheader
+
+These procedures fence memory operations in a way that is consistent
+with acquire--release patterns. Specifically,
+\scheme{memory-order-acquire} ensures at least a load--load and
+load--store fence, and \scheme{memory-order-release} ensures at least
+a store--store and store--load fence.
 
 
 \section{Thread Parameters\label{SECTTHREADPARAMETERS}}

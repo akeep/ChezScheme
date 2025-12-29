@@ -72,6 +72,7 @@
     ($hand-coded 'nonprocedure-code)))
 
 (define $foreign-entry ($hand-coded '$foreign-entry-procedure))
+;; The name `$install-library-entry` is special to `vfasl-can-combine?`
 (define $install-library-entry
   ($hand-coded '$install-library-entry-procedure))
 
@@ -106,9 +107,14 @@
     ((null? (cdr args)) (k (car args)))
     (else (#2%apply k args)))) ; library apply not available yet
 
+;; before anything that returns multiple values
+(define-hand-coded-library-entry values-error)
+
 ;;; dounderflow & nuate must come before callcc
 (define-hand-coded-library-entry dounderflow)
 (define-hand-coded-library-entry nuate)
+(define-hand-coded-library-entry reify-1cc)
+(define-hand-coded-library-entry maybe-reify-cc)
 (define-hand-coded-library-entry callcc)
 (define-hand-coded-library-entry call1cc)
 (define-hand-coded-library-entry dofargint32)
@@ -121,8 +127,13 @@
 (define-hand-coded-library-entry dofretu16*)
 (define-hand-coded-library-entry dofretu32*)
 (define-hand-coded-library-entry domvleterr)
-(define-hand-coded-library-entry values-error)
 (define-hand-coded-library-entry bytevector=?)
+(define-hand-coded-library-entry $wrapper-apply)
+(define-hand-coded-library-entry wrapper-apply)
+(define-hand-coded-library-entry arity-wrapper-apply)
+(define-hand-coded-library-entry event-detour)
+(define-hand-coded-library-entry popcount-slow) ; before fxpopcount use
+(define-hand-coded-library-entry cpu-features)  ; before fxpopcount use
 
 (define $instantiate-code-object ($hand-coded '$instantiate-code-object))
 
@@ -268,9 +279,9 @@
   (define fxvector-oops
     (lambda (who x)
       ($oops who "~s is not an fxvector" x)))
-  (define mutable-fxvector-oops
+  (define flvector-oops
     (lambda (who x)
-      ($oops who "~s is not a mutable fxvector" x)))
+      ($oops who "~s is not an flvector" x)))
   (define bytevector-oops
     (lambda (who x)
       ($oops who "~s is not a bytevector" x)))
@@ -280,6 +291,20 @@
   (define index-oops
     (lambda (who x i)
       ($oops who "~s is not a valid index for ~s" i x)))
+  (define bytevector-index-oops
+    ;; for consistency with error before library entry was introduced:
+    (lambda (who x i)
+      ($oops who "invalid index ~s for bytevector ~s" i x)))
+  (define real-oops
+    (lambda (who x)
+      ($oops who "~s is not a real number" x)))
+  (define number-oops
+    (lambda (who x)
+      ($oops who "~s is not a number" x)))
+
+  (define stencil-vector-oops
+    (lambda (who x)
+      ($oops who "~s is not a stencil vector" x)))
 
   (define-library-entry (char->integer x) (char-oops 'char->integer x))
 
@@ -315,7 +340,7 @@
         (if (mutable-vector? v)
             (index-oops 'vector-set-fixnum! v i)
             (mutable-vector-oops 'vector-set-fixnum! v))
-        ($oops 'vector-set-fixnum! "~s is not a fixnum" x)))
+        (fixnum-oops 'vector-set-fixnum! x)))
 
   (define-library-entry (vector-length v)
     (vector-oops 'vector-length v))
@@ -331,14 +356,29 @@
         (fxvector-oops 'fxvector-ref v)))
 
   (define-library-entry (fxvector-set! v i x)
-    (if (mutable-fxvector? v)
+    (if (fxvector? v)
         (if (and (fixnum? i) ($fxu< i (fxvector-length v)))
             (fixnum-oops 'fxvector-set! x)
             (index-oops 'fxvector-set! v i))
-        (mutable-fxvector-oops 'fxvector-set! v)))
+        (fxvector-oops 'fxvector-set! v)))
 
   (define-library-entry (fxvector-length v)
     (fxvector-oops 'fxvector-length v))
+
+  (define-library-entry (flvector-ref v i)
+    (if (flvector? v)
+        (index-oops 'flvector-ref v i)
+        (flvector-oops 'flvector-ref v)))
+
+  (define-library-entry (flvector-set! v i x)
+    (if (flvector? v)
+        (if (and (fixnum? i) ($fxu< i (flvector-length v)))
+            ($oops 'flvector-set! "~s is not a flonum" x)
+            (index-oops 'flvector-set! v i))
+        (flvector-oops 'flvector-set! v)))
+
+  (define-library-entry (flvector-length v)
+    (flvector-oops 'flvector-length v))
 
   (define-library-entry (bytevector-s8-ref v i)
     (if (bytevector? v)
@@ -371,19 +411,37 @@
   (define-library-entry (bytevector-length v)
     (bytevector-oops 'bytevector-length v))
 
+  (define-library-entry ($stencil-vector-mask v)
+    (stencil-vector-oops '$stencil-vector-mask v))
+
+  (define-library-entry (stencil-vector-mask v)
+    (stencil-vector-oops 'stencil-vector-mask v))
+
+  (define-library-entry (bytevector-ieee-double-native-ref v i)
+    (if (bytevector? v)
+        (bytevector-index-oops 'bytevector-ieee-double-native-ref v i)
+        (bytevector-oops 'bytevector-ieee-double-native-ref v)))
+
+  (define-library-entry (bytevector-ieee-double-native-set! v i)
+    (if (mutable-bytevector? v)
+        (bytevector-index-oops 'bytevector-ieee-double-native-set! v i)
+        (mutable-bytevector-oops 'bytevector-ieee-double-native-set! v)))
+
   (define-library-entry (char=? x y) (char-oops 'char=? (if (char? x) y x)))
   (define-library-entry (char<? x y) (char-oops 'char<? (if (char? x) y x)))
   (define-library-entry (char>? x y) (char-oops 'char>? (if (char? x) y x)))
   (define-library-entry (char<=? x y) (char-oops 'char<=? (if (char? x) y x)))
   (define-library-entry (char>=? x y) (char-oops 'char>=? (if (char? x) y x)))
-)
 
-(define-library-entry (real->flonum x who)
-  (cond
-    [(fixnum? x) (fixnum->flonum x)]
-    [(or (bignum? x) (ratnum? x)) (inexact x)]
-    [(flonum? x) x]
-    [else ($oops who "~s is not a real number" x)]))
+  (define-library-entry (exact? x) (number-oops 'exact? x))
+  (define-library-entry (inexact? x) (number-oops 'inexact? x))
+
+  (define-library-entry ($real->flonum who x)
+    (cond
+      [(fixnum? x) (fixnum->flonum x)]
+      [(or (bignum? x) (ratnum? x)) (#2%$real->flonum who x)]
+      [else (real-oops who x)]))
+)
 
 (let ()
   (define pair-oops
@@ -394,6 +452,8 @@
   (define-library-entry (cdr x) (pair-oops 'cdr x))
   (define-library-entry (set-car! x y) (pair-oops 'set-car! x))
   (define-library-entry (set-cdr! x y) (pair-oops 'set-cdr! x))
+  (define-library-entry (car-cas! x y z) (pair-oops 'car-cas! x))
+  (define-library-entry (cdr-cas! x y z) (pair-oops 'cdr-cas! x))
 )
 
 (let ()
@@ -468,6 +528,14 @@
 (define-library-entry (fx1+ x) (fxoops1 'fx1+ x))
 (define-library-entry (fx1- x) (fxoops1 'fx1- x))
 
+(define-library-entry (fx+/wraparound x y) (fxoops2 'fx+/wraparound x y))
+(define-library-entry (fx-/wraparound x y) (fxoops2 'fx-/wraparound x y))
+(define-library-entry (fx*/wraparound x y) (fxoops2 'fx*/wraparound x y))
+(define-library-entry (fxsll/wraparound x y)
+  (if (and (fixnum? x) (fixnum? y))
+      (shift-count-oops 'fxsll/wraparound y)
+      (fxoops2 'fxsll/wraparound x y)))
+
 (define-library-entry (fx= x y) (fxnonfixnum2 'fx= x y))
 (define-library-entry (fx< x y) (fxnonfixnum2 'fx< x y))
 (define-library-entry (fx> x y) (fxnonfixnum2 'fx> x y))
@@ -494,6 +562,10 @@
 (define-library-entry (fxxor x y) (fxnonfixnum2 'fxxor x y))
 (define-library-entry (fxand x y) (fxnonfixnum2 'fxand x y))
 (define-library-entry (fxnot x) (fxnonfixnum1 'fxnot x))
+(define-library-entry (fixnum->flonum x) (fxnonfixnum1 'fixnum->flonum x))
+(define-library-entry (fxpopcount x) ($oops 'fxpopcount "~s is not a non-negative fixnum" x))
+(define-library-entry (fxpopcount32 x) ($oops 'fxpopcount32 "~s is not a 32-bit fixnum" x))
+(define-library-entry (fxpopcount16 x) ($oops 'fxpopcount16 "~s is not a 16-bit fixnum" x))
 
 (define-library-entry (fxsll x y)
   (cond
@@ -626,21 +698,53 @@
   (define-library-entry (fl* x y) (flonum-oops 'fl* (if (flonum? x) y x)))
   (define-library-entry (fl/ x y) (flonum-oops 'fl/ (if (flonum? x) y x)))
   (define-library-entry (flnegate x) (flonum-oops 'fl- x))
+  (define-library-entry (flabs x) (flonum-oops 'flabs x))
+  (define-library-entry (flmin x y) (flonum-oops 'flmin (if (flonum? x) y x)))
+  (define-library-entry (flmax x y) (flonum-oops 'flmax (if (flonum? x) y x)))
+
+  (define-library-entry (flsqrt x) (flonum-oops 'flsqrt x))
+  (define-library-entry (flround x) (flonum-oops 'flround x))
+  (define-library-entry (flfloor x) (flonum-oops 'flfloor x))
+  (define-library-entry (flceiling x) (flonum-oops 'flceiling x))
+  (define-library-entry (fltruncate x) (flonum-oops 'fltruncate x))
+  (define-library-entry (flsingle x) (flonum-oops 'flsingle x))
+  (define-library-entry (flsin x) (flonum-oops 'flsin x))
+  (define-library-entry (flcos x) (flonum-oops 'flcos x))
+  (define-library-entry (fltan x) (flonum-oops 'fltan x))
+  (define-library-entry (flasin x) (flonum-oops 'flasin x))
+  (define-library-entry (flacos x) (flonum-oops 'flacos x))
+  (define-library-entry (flatan x) (flonum-oops 'flatan x))
+  (define-library-entry (flatan2 x y) (flonum-oops 'flatan (if (flonum? x) y x)))
+  (define-library-entry (flexp x) (flonum-oops 'flexp x))
+  (define-library-entry (fllog x) (flonum-oops 'fllog x))
+  (define-library-entry (fllog2 x y) (flonum-oops 'fllog (if (flonum? x) y x)))
+  (define-library-entry (flexpt x y) (flonum-oops 'flexpt (if (flonum? x) y x)))
+  (define-library-entry (flbit-field x y z) (flonum-oops 'flbit-field x))
+
+  (define-library-entry (flonum->fixnum x) (if (flonum? x)
+                                               ($oops 'flonum->fixnum "result for ~s would be outside of fixnum range" x)
+                                               (flonum-oops 'flonum->fixnum x)))
 )
 
+;; Now using `rint` via a C entry
+#;
 (define-library-entry (flround x)
  ; assumes round-to-nearest-or-even
   (float-type-case
     [(ieee)
      (define threshold+ #i#x10000000000000)
      (define threshold- #i#x-10000000000000)])
-  (if (fl>= x 0.0)
-      (if (fl< x threshold+)
-          (fl- (fl+ x threshold+) threshold+)
-          x)
-      (if (fl> x threshold-)
-          (fl- (fl+ x threshold-) threshold-)
-          x)))
+  (if (fl= x 0.0)
+      x ; don't change sign
+      (if (fl>= x 0.0)
+          (if (fl< x threshold+)
+              (fl- (fl+ x threshold+) threshold+)
+              x)
+          (if (fl>= x -0.5)
+              -0.0 ; keep negative
+              (if (fl> x threshold-)
+                  (fl- (fl+ x threshold-) threshold-)
+                  x)))))
 
 ;;; The generic comparison entries assume the fixnum case is inlined.
 
@@ -772,6 +876,9 @@
   (define exactintoops2
     (lambda (who x y)
       (exactintoops1 who (if (or (fixnum? x) (bignum? x)) y x))))
+  (define invalidindexoops
+    (lambda (who k)
+      ($oops who "invalid bit index ~s" k)))
 
   (define-library-entry (logand x y)
     (if (if (fixnum? x)
@@ -846,27 +953,27 @@
          (cond
            [(fixnum? k)
             (if (fx< k 0)
-                ($oops who "invalid bit index ~s" k)
+                (invalidindexoops who k)
                ; this case left to us by cp1in logbit? handler
                 (fx< n 0))]
            [(bignum? k)
             (if (< k 0)
-                ($oops who "invalid bit index ~s" k)
+                (invalidindexoops who k)
                ; this case left to us by cp1in logbit? handler
                 (fx< n 0))]
-           [else (exactintoops1 who k)])]
+           [else (invalidindexoops who k)])]
         [(bignum? n)
          (cond
            [(fixnum? k)
             (if (fx< k 0)
-                ($oops who "invalid bit index ~s" k)
+                (invalidindexoops who k)
                 ($logbit? k n))]
            [(bignum? k)
             (if (< k 0)
-                ($oops who "invalid bit index ~s" k)
+                (invalidindexoops who k)
                ; $logbit? requires k to be a fixnum
                 (fxlogtest (ash n (- k)) 1))]
-           [else (exactintoops1 who k)])]
+           [else (invalidindexoops who k)])]
         [else (exactintoops1 who n)]))
     (define-library-entry (logbit? k n) (do-logbit? 'logbit? k n))
     (define-library-entry (bitwise-bit-set? n k) (do-logbit? 'bitwise-bit-set? k n)))
@@ -876,14 +983,14 @@
         (cond
           [(fixnum? k)
            (if (fx< k 0)
-               ($oops 'logbit0 "invalid bit index ~s" k)
+               (invalidindexoops 'logbit0 k)
                ($logbit0 k n))]
           [(bignum? k)
            (if (< k 0)
-               ($oops 'logbit0 "invalid bit index ~s" k)
+               (invalidindexoops 'logbit0 k)
               ; $logbit0 requires k to be a fixnum
                ($logand n ($lognot (ash 1 k))))]
-          [else (exactintoops1 'logbit0 k)])
+          [else (invalidindexoops 'logbit0 k)])
         (exactintoops1 'logbit0 n)))
 
   (define-library-entry (logbit1 k n)
@@ -891,14 +998,14 @@
         (cond
           [(fixnum? k)
            (if (fx< k 0)
-               ($oops 'logbit1 "invalid bit index ~s" k)
+               (invalidindexoops 'logbit1 k)
                ($logbit1 k n))]
           [(bignum? k)
            (if (< k 0)
-               ($oops 'logbit1 "invalid bit index ~s" k)
+               (invalidindexoops 'logbit1 k)
               ; $logbit1 requires k to be a fixnum
                ($logor n (ash 1 k)))]
-          [else (exactintoops1 'logbit1 k)])
+          [else (invalidindexoops 'logbit1 k)])
         (exactintoops1 'logbit1 n)))
 
   (define-library-entry (logtest x y)
@@ -1350,6 +1457,18 @@
 (define-library-entry (apply3 p x1 x2 x3 ls)
   (doapply p (x1 x2 x3) ls))
 
+(define-library-entry ($check-continuation c check-as? as)
+  (let ([who 'call-in-other-continuation])
+    (unless ($continuation? c)
+      ($oops who "~s is not a continuation" c))
+    (when check-as?
+      (unless (let ([c-as ($continuation-attachments c)])
+                (or (eq? as c-as)
+                    (and (pair? as)
+                         (eq? (cdr as) c-as))))
+        ($oops who "~s is not an extension of of the attachments of ~s" as c)))
+    ($do-wind ($current-winders) ($continuation-winders c))))
+
 (define-library-entry (eqv? x y)
   (if (eq? x y) 
       #t
@@ -1365,7 +1484,7 @@
         [else #f])))
 
 (define-library-entry (memv x ls)
-  (if (or (symbol? x) (#%$immediate? x))
+  (if (or (symbol? x) (fixmediate? x))
       (memq x ls)
       (let memv ([ls ls])
         (and (not (null? ls))
@@ -1388,6 +1507,16 @@
 
 (let ()
   (include "hashtable-types.ss")
+
+  (define (ht-size-cas! ht old new)
+    (let-syntax ([size-field-pos
+                  (lambda (stx)
+                    (include "hashtable-types.ss")
+                    (let loop ([names (csv7:record-type-field-names (record-type-descriptor ht))])
+                      (if (eq? (car names) 'size)
+                          0
+                          (fx+ 1 (loop (cdr names))))))])
+      ($record-cas! ht (size-field-pos) old new)))
 
   ;;; eq hashtable operations must be compiled with
   ;;; generate-interrupt-trap #f and optimize-level 3
@@ -1425,6 +1554,11 @@
                    (if (fx<= n2 target)
                        (adjust! h vec n n2)
                        (loop n2)))))))]))
+
+    ;; Must be consistent with `eq_hash` in "../c/segment.h"
+    (define-syntax eq-hash
+      (syntax-rules ()
+        [(_ v-expr) (fixmix ($fxaddress v-expr))]))
   
     (define adjust!
       (lambda (h vec1 n1 n2)
@@ -1434,7 +1568,7 @@
             (let loop ([b (vector-ref vec1 i1)])
               (unless (fixnum? b)
                 (let ([next ($tlc-next b)] [keyval ($tlc-keyval b)])
-                  (let ([i2 (fxlogand ($fxaddress (car keyval)) mask2)])
+                  (let ([i2 (fxlogand (eq-hash (car keyval)) mask2)])
                     ($set-tlc-next! b (vector-ref vec2 i2))
                     (vector-set! vec2 i2 b))
                   (loop next)))))
@@ -1443,19 +1577,26 @@
     (define-library-entry (eq-hashtable-ref h x v)
       (lookup-keyval x
         (let ([vec (ht-vec h)])
-          (vector-ref vec (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))))
+          (vector-ref vec (fxlogand (eq-hash x) (fx- (vector-length vec) 1))))
         cdr v))
   
+    (define-library-entry (eq-hashtable-ref-cell h x)
+      (lookup-keyval x
+        (let ([vec (ht-vec h)])
+          (vector-ref vec (fxlogand (eq-hash x) (fx- (vector-length vec) 1))))
+        (lambda (x) x)
+        #f))
+
     (define-library-entry (eq-hashtable-contains? h x)
       (lookup-keyval x
         (let ([vec (ht-vec h)])
-          (vector-ref vec (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))))
+          (vector-ref vec (fxlogand (eq-hash x) (fx- (vector-length vec) 1))))
         (lambda (x) #t)
         #f))
   
     (define-library-entry (eq-hashtable-cell h x v)
       (let* ([vec (ht-vec h)]
-             [idx (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))]
+             [idx (fxlogand (eq-hash x) (fx- (vector-length vec) 1))]
              [b (vector-ref vec idx)])
         (lookup-keyval x b
           values
@@ -1467,12 +1608,34 @@
             (vector-set! vec idx ($make-tlc h keyval b))
             (incr-size! h vec)
             keyval))))
+
+    ;; Note: never adjusts the vector size. Use `eq-hashtable-set!`
+    ;; with exclusive access (perhaps in a GC callback) to enable
+    ;; resizing.
+    (define-library-entry (eq-hashtable-try-atomic-cell h x v)
+      (let* ([vec (ht-vec h)]
+             [idx (fxlogand (eq-hash x) (fx- (vector-length vec) 1))]
+             [b (vector-ref vec idx)])
+        (lookup-keyval x b
+          values
+          (let ([keyval (let ([subtype (eq-ht-subtype h)])
+                          (cond
+                           [(eq? subtype (constant eq-hashtable-subtype-normal)) (cons x v)]
+                           [(eq? subtype (constant eq-hashtable-subtype-weak)) (weak-cons x v)]
+                           [else (ephemeron-cons x v)]))])
+            (and (vector-cas! vec idx b ($make-tlc h keyval b))
+                 (let loop ()
+                   (let* ([old-size (ht-size h)]
+                          [size (fx+ old-size 1)])
+                     (or (ht-size-cas! h old-size size)
+                         (loop))))
+                 keyval)))))
   
     (let ()
       (define do-set!
         (lambda (h x v)
           (let* ([vec (ht-vec h)]
-                 [idx (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))]
+                 [idx (fxlogand (eq-hash x) (fx- (vector-length vec) 1))]
                  [b (vector-ref vec idx)])
             (lookup-keyval x b
               (lambda (keyval) (set-cdr! keyval v))
@@ -1492,7 +1655,7 @@
   
       (define-library-entry (eq-hashtable-update! h x p v)
         (let* ([vec (ht-vec h)]
-               [idx (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))]
+               [idx (fxlogand (eq-hash x) (fx- (vector-length vec) 1))]
                [b (vector-ref vec idx)])
           (lookup-keyval x b
             (lambda (a) (set-cdr! a (p (cdr a))))
@@ -1500,7 +1663,7 @@
   
     (define-library-entry (eq-hashtable-delete! h x)
       (let* ([vec (ht-vec h)]
-             [idx (fxlogand ($fxaddress x) (fx- (vector-length vec) 1))]
+             [idx (fxlogand (eq-hash x) (fx- (vector-length vec) 1))]
              [b (vector-ref vec idx)])
         (unless (fixnum? b)
           (if (eq? (car ($tlc-keyval b)) x)
@@ -1539,7 +1702,7 @@
 
     (define adjust!
       (lambda (h vec1 n2)
-        (let ([vec2 (make-vector n2 '())]
+        (let ([vec2 ($make-vector/no-interrupt-trap n2 '())]
               [mask2 (fx- n2 1)])
           (vector-for-each
             (lambda (b)
@@ -1561,6 +1724,17 @@
                     (let ([a (car b)])
                       (if (eq? (car a) x) (cdr a) (loop (cdr b)))))))
             (pariah v))))
+
+    (define-library-entry (symbol-hashtable-ref-cell h x)
+      (let ([hc ($symbol-hash x)])
+        (if hc
+            (let ([vec (ht-vec h)])
+              (let loop ([b (vector-ref vec (fxlogand hc (fx- (vector-length vec) 1)))])
+                (if (null? b)
+                    #f
+                    (let ([a (car b)])
+                      (if (eq? (car a) x) a (loop (cdr b)))))))
+            (pariah #f))))
 
     (define-library-entry (symbol-hashtable-contains? h x)
       (let ([hc ($symbol-hash x)])
