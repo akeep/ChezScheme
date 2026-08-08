@@ -2269,6 +2269,14 @@
     (eqv? (remainder -4.0 2.0) 0.0)
     (eqv? (remainder 4.0 -2.0) 0.0)
     (eqv? (remainder 0 2.0) 0)
+    (eqv? (remainder 7.0 1) 0.0)
+    (eqv? (remainder 7.0 -1) 0.0)
+    (eqv? (remainder #e1e1000 1.0) 0.0)
+    (eqv? (remainder #e1e1000 3.0) 1.0)
+    (eqv? (remainder #e2e1000 3.0) 2.0)
+    (eqv? (remainder #e-1e1000 1.0) 0.0)
+    (eqv? (remainder #e-1e1000 3.0) -1.0)
+    (eqv? (remainder #e-2e1000 3.0) -2.0)
     (fl= (remainder 5.842423430828094e+60 10) 4.0)
     (fl= (remainder 5.842423430828094e+60 10.0) 4.0)
     (fl= (remainder 5.842423430828094e+60 -10) 4.0)
@@ -2320,6 +2328,14 @@
     (eqv? (modulo -4.0 2.0) 0.0)
     (eqv? (modulo 4.0 -2.0) 0.0)
     (eqv? (modulo 0 2.0) 0)
+    (eqv? (modulo 7.0 1) 0.0)
+    (eqv? (modulo 7.0 -1) 0.0)
+    (eqv? (modulo #e1e1000 1.0) 0.0)
+    (eqv? (modulo #e1e1000 3.0) 1.0)
+    (eqv? (modulo #e2e1000 3.0) 2.0)
+    (eqv? (modulo #e-1e1000 1.0) 0.0)
+    (eqv? (modulo #e-1e1000 3.0) 2.0)
+    (eqv? (modulo #e-2e1000 3.0) 1.0)
     (fl= (modulo 5.842423430828094e+60 10) 4.0)
     (fl= (modulo 5.842423430828094e+60 10.0) 4.0)
     (fl= (modulo -5.842423430828094e+60 10) 6.0)
@@ -2781,6 +2797,16 @@
     ($flexpt~= (expt .999999999999923 9113206036900123) 1.1282707411029136e-305)
     ($flexpt~= (expt .999999999999923 9113206036900124) 1.1282707411028267e-305)
     ($flexpt~= (expt .999999999999923 9113206036900125) 1.1282707411027398e-305)
+   ; large exponent: out of memory for integer bases with |x| > 1
+    (error? (expt 3 (expt 2 100)))
+    (error? (expt -2 (expt 2 100)))
+    (error? (expt (expt 10 100) (expt 2 100)))
+    (error? (expt 3 (- (expt 2 100))))
+   ; large exponent: special bases should still work
+    (eqv? (expt 0 (expt 2 100)) 0)
+    (eqv? (expt 1 (expt 2 100)) 1)
+    (eqv? (expt -1 (expt 2 100)) 1)
+    (eqv? (expt -1 (+ 1 (expt 2 100))) -1)
  )
 
 (mat expt-mod
@@ -3127,6 +3153,7 @@
     (error? (log))
     (error? (log 'a))
     (error? (log 0))
+    (error? (log 5 1))
     (= (log 1) 0)
     (fl= (log 1.0) 0.0)
     (eqv? (log 0.0) -inf.0)
@@ -3489,6 +3516,7 @@
        #t)
      #t)
    ($test-right-shift (lambda (x n) (ash x (- n))))
+   (eqv? (ash 0 (expt 2 28)) 0)
 )
 
 (mat bitwise-arithmetic-shift
@@ -5885,6 +5913,18 @@
               (if (fx= i (* (integer-length (ash (most-negative-fixnum) 5)) 2))
                   (g (fx- j 1))
                   (and (p? n i) (f (fx+ i 1)))))))))
+  (eqv? (logbit0 (expt 2 28) 0) 0)
+  ;; logbit0 with fixnum k at the integer-length boundary
+  (eqv? (logbit0 2 7) 3)   ; k < integer-length, bit set
+  (eqv? (logbit0 3 7) 7)   ; k = integer-length, bit clear
+  (eqv? (logbit0 4 7) 7)   ; k > integer-length, bit clear
+  ;; logbit0 with large fixnum k and non-negative n
+  (eqv? (logbit0 (most-positive-fixnum) 0) 0)
+  (eqv? (logbit0 (most-positive-fixnum) 5) 5)
+  ;; logbit0 at the fixnum/bignum k boundary
+  (eqv? (logbit0 (+ (most-positive-fixnum) 1) 0) 0)
+  (eqv? (logbit0 (+ (most-positive-fixnum) 1) 5) 5)
+  (eqv? (logbit0 (expt 2 100) 7) 7)
 )
 
 (mat logbit1
@@ -6020,6 +6060,12 @@
               (if (fx= i (* (integer-length (ash (most-negative-fixnum) 5)) 2))
                   (g (fx- j 1))
                   (and (p? n i) (f (fx+ i 1)))))))))
+  (eqv? (logbit1 (expt 2 28) -1) -1)
+  ;; logbit1 at the fixnum/bignum k boundary with negative n
+  (eqv? (logbit1 (+ (most-positive-fixnum) 1) -1) -1)
+  (eqv? (logbit1 (+ (most-positive-fixnum) 1) -5) -5)
+  (eqv? (logbit1 (expt 2 100) -1) -1)
+  (eqv? (logbit1 (expt 2 100) -5) -5)
 )
 
 (mat bitwise-copy-bit ; adapted from logbit0 and logbit1 above

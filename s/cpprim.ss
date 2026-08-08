@@ -368,7 +368,12 @@
             (let-values ([(type e)
                           (nanopass-case (L7 Expr) e
                             [(raw ,e) (values 'uptr e)]
-                            [else (values type e)])])
+                            [else (cond
+                                    [(eq? type 'try-fp)
+                                     (if (known-flonum-result? e)
+                                         (values 'fp e)
+                                         (values 'uptr e))]
+                                    [else (values type e)])])])
               (let ([t (make-tmp 't type)])
                 (values t (lift-fp-unboxed
                            (lambda (body)
@@ -742,6 +747,7 @@
                              (set! ,(%mref ,t ,offset) ,(car args))
                              ,(f (cdr args) (fx+ offset (constant ptr-bytes)))))))))))))
     (define build-$real->flonum
+      ; $real->flonum assumes the generated code will raise an error at runtime if x is not real
       (lambda (src sexpr who x)
         (if (known-flonum-result? x)
             x
@@ -3600,6 +3606,7 @@
       (define-tc-parameter $current-handler-stack handler-stack)
       (define-tc-parameter default-record-equal-procedure default-record-equal-procedure)
       (define-tc-parameter default-record-hash-procedure default-record-hash-procedure)
+      (define-tc-parameter current-errno-source current-errno-source)
       )
 
     (let ()
@@ -5460,6 +5467,16 @@
                         ,(build-libcall #t src sexpr $real->flonum `(quote real->flonum) e-x)))))])
       (define-inline 3 $real->flonum
         [(who x) (build-$real->flonum src sexpr who x)])
+      (define-inline 2 $real->flonum
+        [(who x)
+         (nanopass-case (L7 Expr) who
+           [(quote ,d)
+            (guard (or (not d)
+                       (symbol? d)
+                       (string? d)))
+            ; assume the generated code will raise an error at runtime if x is not real
+            (build-$real->flonum src sexpr who x)]
+           [else #f])])
     )
     (define-inline 2 $record
       [(tag . args) (build-$record tag args)])
@@ -7199,11 +7216,11 @@
         (define-inline 2 bytevector-ieee-double-native-set!
           [(e-bv e-offset e-val)
            (bind #t (e-bv e-offset)
-             (let ([info (make-info-call #f #f #f #f #f)])
-               `(if (call ,info ,#f ,(lookup-primref 3 '$bytevector-set!-check?) (quote 64) ,e-bv ,e-offset)
-                    ;; checks to make sure e-val produces a real number:
-                    (call ,info ,#f ,(lookup-primref 3 'bytevector-ieee-double-native-set!) ,e-bv ,e-offset ,e-val)
-                    ,(build-libcall #t src sexpr bytevector-ieee-double-native-set! e-bv e-offset))))]))
+             (bind #f try-fp (e-val)
+               (let ([info (make-info-call #f #f #f #f #f)])
+                 `(if (call ,info ,#f ,(lookup-primref 3 '$bytevector-set!-check?) (quote 64) ,e-bv ,e-offset)
+                      (call ,info ,#f ,(lookup-primref 3 'bytevector-ieee-double-native-set!) ,e-bv ,e-offset ,e-val)
+                      ,(build-libcall #t src sexpr bytevector-ieee-double-native-set! e-bv e-offset)))))]))
 
       (let ()
         (define-syntax define-bv-int-ref-inline
