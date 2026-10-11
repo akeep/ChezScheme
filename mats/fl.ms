@@ -690,6 +690,58 @@
     (eqv? (flsingle -1e-100) -0.0)
  )
 
+(mat fl-unary-destination
+  ;; Using `black-box` ensures that these exercise generated instructions
+  ;; instead of constant folding. Keep an input live as well as consuming it.
+  (let ([root (black-box (lambda (x) (flsqrt x)))]
+        [twice (black-box (lambda (x) (flsqrt (flsqrt x))))]
+        [live (black-box (lambda (x y)
+                           (let ([v (fl+ x y)]) (fl+ v (flsqrt v)))))])
+    (and (eqv? (root -0.0) -0.0)
+         (eqv? (root +inf.0) +inf.0)
+         (flnan? (root -1.0))
+         (andmap (lambda (p) (eqv? (twice (car p)) (cadr p)))
+                 '((81.0 3.0) (256.0 4.0) (1.0 1.0)
+                   (0.0 0.0) (-0.0 -0.0) (+inf.0 +inf.0)))
+         (eqv? (live 7.0 9.0) 20.0)
+         (eqv? (live 1.0 3.0) 6.0)))
+
+  (let ([round (black-box (lambda (x) (flsingle x)))]
+        [twice (black-box (lambda (x) (flsingle (flsingle x))))]
+        [live (black-box (lambda (x y)
+                          (let ([v (fl+ x y)]) (fl+ v (flsingle v)))))]
+        [store (black-box (lambda (bv x)
+                            (bytevector-ieee-single-native-set! bv 0 x)))]
+        [load (black-box (lambda (bv)
+                           (bytevector-ieee-single-native-ref bv 0)))]
+        [bv (make-bytevector 4)])
+    (and (eqv? (live 1.25 3.0) 8.5)
+         (flnan? (round +nan.0))
+         (flnan? (twice +nan.0))
+         (andmap
+          (lambda (p)
+            (let ([x (car p)] [bits (cadr p)] [expected (caddr p)])
+              (store bv x)
+              (and (= (bytevector-u32-native-ref bv 0) bits)
+                   (eqv? (load bv) expected)
+                   (eqv? (round x) expected)
+                   (eqv? (twice x) expected))))
+          '((0.0 #x00000000 0.0)
+            (-0.0 #x80000000 -0.0)
+            (1.0 #x3f800000 1.0)
+            (-2.5 #xc0200000 -2.5)
+            (16777217.0 #x4b800000 16777216.0)
+            (16777219.0 #x4b800002 16777220.0)
+            (1.401298464324817e-45 #x00000001 1.401298464324817e-45)
+            (-1.401298464324817e-45 #x80000001 -1.401298464324817e-45)
+            (7.006492321624085e-46 #x00000000 0.0)
+            (-7.006492321624085e-46 #x80000000 -0.0)
+            (3.4028234663852886e38 #x7f7fffff 3.4028234663852886e38)
+            (1e100 #x7f800000 +inf.0)
+            (-1e100 #xff800000 -inf.0)
+            (+inf.0 #x7f800000 +inf.0)
+            (-inf.0 #xff800000 -inf.0))))))
+
 (mat flinteger?
     (error? (flinteger? 'a))
     (error? (flinteger? "hi"))
@@ -1211,6 +1263,7 @@
   (check-loop-allocation (lambda (v) (exact->inexact (flbit-field (fl+ v 2.0) 1 23))))
   (check-loop-allocation (lambda (v) (exact->inexact (flbit-field v 40 63))))
   (check-loop-allocation (lambda (v) (exact->inexact (flbit-field (fl+ v 2.0) 40 63))))
+  (check-loop-allocation (lambda (v) (let ([x (fl+ v v)]) (exact->inexact (flbit-field x 40 63)))))
 
   (let ([i 0])
     (check-loop-allocation (lambda (v) (begin
@@ -1246,6 +1299,12 @@
                                (fl-make-rectangular (fl- (cfl-real-part v) 1.0)
                                                     (fl+ 1.0 (cfl-imag-part v))))
                              1.0-3.0i))
+  (or (and (not (enable-cp0))
+           (not (= 3 (optimize-level))))
+      (check-loop-allocation (lambda (v)
+                               (let ([v (fl- (cfl-real-part v) 1.0)])
+                                 (fl-make-rectangular v v)))
+                             1.0-3.0i))
 
   (check-loop-allocation (lambda (v)
                            ;; The two single-argument `fl+`s here should work as
@@ -1254,6 +1313,55 @@
                              (if (fx= n 0)
                                  (fl+ v)
                                  (loop (fx- n 1) (fl+ v 1.0))))))
+
+  (check-loop-allocation (lambda (v)
+                           ;; check that a `let` around the initial call into a
+                           ;; loop is recognized by the lop-detection pass, which
+                           ;; in turn enables flonum unboxing
+                           (letrec ([loop (lambda (n v)
+                                            (if (fx= n 0)
+                                                (fl+ v)
+                                                (loop (fx- n 1) (fl+ v 1.0))))])
+                             (let ([v (fl+ v v)])
+                               ((black-box void))
+                               (loop 100 (fl+ v v))))))
+
+  (check-loop-allocation (lambda (v)
+                           ;; check that a loop entry can be nested in a call
+                           (letrec ([loop (lambda (n v)
+                                            (if (fx= n 0)
+                                                (fl+ v)
+                                                (loop (fx- n 1) (fl+ v 1.0))))])
+                             ((black-box (lambda (x y) x))
+                              ((black-box (lambda (x y z) z))
+                               'skip
+                               'skip-too
+                               (loop 100 (fl+ v)))
+                              'skip))))
+
+  (check-loop-allocation (lambda (v)
+                           ;; check that two loops can work
+                           (letrec ([loop (lambda (n v)
+                                            (if (fx= n 0)
+                                                (fl+ v)
+                                                (loop (fx- n 1) (fl+ v 1.0))))])
+                             (letrec ([loop2 (lambda (n v)
+                                               (if (fx= n 0)
+                                                   v
+                                                   (loop2 (fx- n 1) v)))])
+                               (loop2 100 (loop 100 (fl+ v 1.0)))))))
+
+  (check-loop-allocation (lambda (v)
+                           ;; check that nested loops can work
+                           (letrec* ([loop2 (lambda (n v)
+                                              (if (fx= n 0)
+                                                  (loop 100 (fl+ v 1.0))
+                                                  (loop2 (fx- n 1) v)))]
+                                     [loop (lambda (n v)
+                                             (if (fx= n 0)
+                                                 (fl+ v)
+                                                 (loop (fx- n 1) (fl+ v 1.0))))])
+                             (loop2 100 v))))
 
   (let ([bv (make-bytevector 8 0)])
     (check-loop-allocation (lambda (v) (fl+ v (bytevector-ieee-double-native-ref bv 0)))))

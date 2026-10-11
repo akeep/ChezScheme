@@ -71,6 +71,7 @@ extern ptr S_find_more_room(ISPC s, IGEN g, iptr n, ptr old);
 extern void S_record_new_dirty_card(thread_gc *tgc, ptr *ppp, IGEN to_g);
 extern ptr S_find_more_gc_room(thread_gc *tgc, IGEN g, ISPC s, iptr n, ptr old);
 extern void S_close_off_thread_local_segment(ptr tc, ISPC s, IGEN g);
+extern void S_close_off_segment(thread_gc *tgc, ISPC s, IGEN g);
 extern void S_dirty_set(ptr *loc, ptr x);
 extern void S_mark_card_dirty(uptr card, IGEN to_g);
 extern void S_scan_dirty(ptr *p, ptr *endp);
@@ -385,6 +386,7 @@ extern void S_register_scheme_signal(iptr sig);
 extern void S_fire_collector(void);
 extern NORETURN void S_noncontinuable_interrupt(void);
 extern void S_schsig_init(void);
+extern void S_schsig_deinit(void);
 #ifdef DEFINE_MATHERR
 #include <math.h>
 extern INT matherr(struct exception *x);
